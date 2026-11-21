@@ -1,0 +1,40 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}My Profile{% endblock %}
+{% block content %}
+<h1>My Profile</h1>
+<table>
+  <caption>Identity, academic and contact details</caption>
+  <thead><tr><th scope="col">Field</th><th scope="col">Saved value</th><th scope="col">Change</th></tr></thead>
+  <tbody>
+  {% for field, label, value in rows %}
+    <tr>
+      <td data-label="Field">{{ label }}</td>
+      <td data-label="Saved value">{{ value }}</td>
+      <td data-label="Change"><a href="{% url 'accounts:profile_change' field %}" aria-label="Request a change to {{ label }}"><span aria-hidden="true">&#9998;</span> Request change</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Club affiliation</h2>
+{% if is_dosa %}<p>N/A (DoSA and platform roles have no club affiliation).</p>
+{% elif affiliations %}
+<ul>{% for a in affiliations %}<li>{{ a.club.name }} · {{ a.designation|default:a.get_kind_display }}{% if a.term %} · term {{ a.term.label }} ({{ a.term.get_status_display }}){% endif %} · {{ a.start_date|date:"j M Y" }} to {{ a.end_date|date:"j M Y"|default:"open" }}</li>{% endfor %}</ul>
+{% else %}<p class="empty">No club assignment is recorded.</p>{% endif %}
+<p><a href="{% url 'accounts:profile_change' 'club_assignment' %}">Request a club assignment or tenure correction</a> · <a href="{% url 'accounts:profile_change' 'privileges' %}">Request a privilege change</a></p>
+
+<h2>Access</h2>
+{% if grants %}<ul>{% for g in grants %}<li>{{ g }}</li>{% endfor %}</ul>{% else %}<p class="empty">No module access is granted.</p>{% endif %}
+
+<h2>My requests</h2>
+{% if requests %}
+<table>
+  <thead><tr><th scope="col">Request</th><th scope="col">Status</th><th scope="col">Decision</th></tr></thead>
+  <tbody>{% for r in requests %}
+    <tr><td data-label="Request">#{{ r.pk }} {{ r.field|cut:"_"|title }} · {{ r.requested_at|local_dt }}</td>
+      <td data-label="Status">{{ r.get_status_display }}</td>
+      <td data-label="Decision">{% if r.decided_at %}{{ r.decided_by.full_name }} · {{ r.decided_at|local_dt }}{% if r.decision_reason %} · {{ r.decision_reason }}{% endif %}{% else %}Awaiting review{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table>
+{% else %}<p class="empty">You have not requested any changes.</p>{% endif %}
+{% endblock %}

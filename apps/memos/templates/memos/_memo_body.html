@@ -1,0 +1,32 @@
+<article class="memo-a4{% if is_draft %} is-draft{% endif %}" aria-label="Memo content">
+  {% if is_draft %}<p class="memo-watermark" aria-hidden="true">DRAFT</p>{% endif %}
+  <p class="memo-status">Status of this content: <strong>{{ status_label }}</strong>{% if version %} · Version {{ version.number }}{% endif %} · {{ template_label }}</p>
+  <header class="memo-head">
+    <p class="memo-institution">Independent University, Bangladesh (IUB)</p>
+    {% if fields.school %}<p>{{ fields.school }}</p>{% endif %}
+    {% if fields.department %}<p>{{ fields.department }}</p>{% endif %}
+    <p class="memo-title"><em>Office Memo</em></p>
+  </header>
+  <hr>
+  <table class="memo-rows" role="presentation">
+    <tr><th scope="row">To</th><td>{{ fields.to_line|default:"" }}</td></tr>
+    <tr><th scope="row">Through</th><td>{{ fields.through_line|default:"" }}</td></tr>
+    <tr><th scope="row">From</th><td>{{ fields.from_line|default:"" }}</td></tr>
+    <tr><th scope="row">Date</th><td>{{ fields.memo_date|default:"" }}</td></tr>
+    <tr><th scope="row">Subject</th><td><strong>{{ fields.subject|default:"" }}</strong></td></tr>
+  </table>
+  <hr>
+  <div class="memo-text">{{ fields.body|linebreaks }}</div>
+  {% if fields.contact %}<p>Contact: {{ fields.contact }}</p>{% endif %}
+  <section class="memo-signatures" aria-label="Recorded signatures">
+    {% for b in blocks %}
+      <div class="memo-sig">
+        <p><strong>{{ b.label }}</strong></p>
+        {% if b.data_uri %}<img class="signature-img" src="{{ b.data_uri }}" alt="E-signature of {{ b.signature.signer.full_name }}">{% else %}<img class="signature-img" src="{% url 'platform_core:file' b.signature.image.key %}" alt="E-signature of {{ b.signature.signer.full_name }}">{% endif %}
+        <p>{{ b.signature.signer.full_name }}, {{ b.signature.designation }} · {{ b.signature.signed_at|date:"j M Y H:i" }}</p>
+      </div>
+    {% empty %}
+      <p class="help">No signatures are recorded on this content.</p>
+    {% endfor %}
+  </section>
+</article>

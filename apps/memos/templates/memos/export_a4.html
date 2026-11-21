@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ memo.reference }}</title>
+<style>
+  @page { size: a4 portrait; margin: 2cm; }
+  body { font-family: Times, serif; font-size: 11pt; color: #111; }
+  .memo-head { text-align: center; } .memo-head p { margin: 0; }
+  .memo-institution { font-weight: bold; } .memo-title { font-size: 14pt; }
+  .memo-status { font-family: Helvetica, sans-serif; font-size: 8pt; color: #555; }
+  .memo-rows th { text-align: left; width: 70pt; font-weight: normal; vertical-align: top; }
+  .memo-watermark { font-size: 40pt; color: #e4b5b5; text-align: center; }
+  .signature-img { height: 40pt; }
+  .memo-sig { margin-top: 10pt; }
+  hr { border: 0; border-top: 1pt solid #333; }
+</style>
+</head>
+<body>
+{% include "memos/_memo_body.html" %}
+<p class="memo-status">Exported {{ generated_at|date:"j M Y H:i" }} from Amader TOWNHALL.</p>
+</body>
+</html>

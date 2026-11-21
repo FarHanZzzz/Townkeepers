@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Deliveries{% endblock %}
+{% block content %}
+<h1>Failed and pending deliveries</h1>
+<p>A failed email or external delivery never undoes the business action. Retrying uses the original notification and intended IUB recipient.</p>
+{% if rows %}
+<table>
+  <thead><tr><th scope="col">Job</th><th scope="col">Recipient</th><th scope="col">State</th><th scope="col">Attempts</th><th scope="col">Last error</th><th scope="col">Updated</th><th scope="col">Action</th></tr></thead>
+  <tbody>
+  {% for job, notice in rows %}
+    <tr>
+      <td data-label="Job">#{{ job.pk }} {{ job.kind }}{% if notice %}<br>{{ notice.subject }}{% endif %}</td>
+      <td data-label="Recipient">{% if notice %}{{ notice.recipient.full_name }}{% else %}Not applicable{% endif %}</td>
+      <td data-label="State">{% if job.state == "failed" %}{% status_badge job.get_state_display "bad" %}{% else %}{% status_badge job.get_state_display "warn" %}{% endif %}</td>
+      <td data-label="Attempts">{{ job.attempts }} of {{ job.max_attempts }}</td>
+      <td data-label="Last error">{{ job.last_error|default:"None recorded"|truncatechars:160 }}</td>
+      <td data-label="Updated">{{ job.updated_at|local_dt }}</td>
+      <td data-label="Action">{% if job.state != "retryable" %}<form method="post" action="{% url 'platform_core:delivery_retry' job.pk %}">{% csrf_token %}<button type="submit">Retry delivery</button></form>{% else %}Automatic retry scheduled{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No failed, uncertain or retrying deliveries.</p>
+{% endif %}
+{% endblock %}

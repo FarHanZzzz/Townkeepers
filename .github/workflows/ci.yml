@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: townhall
+          POSTGRES_PASSWORD: townhall_ci
+          POSTGRES_DB: townhall
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U townhall"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      DATABASE_URL: postgres://townhall:townhall_ci@localhost:5432/townhall
+      TEST_DATABASE_NAME: test_townhall
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - name: Install from lock
+        run: uv sync --locked
+      - name: Format check
+        run: uv run ruff format --check .
+      - name: Lint
+        run: uv run ruff check .
+      - name: System checks
+        run: uv run python manage.py check
+      - name: Uncommitted migrations
+        run: uv run python manage.py makemigrations --check --dry-run
+      - name: Migrate empty database
+        run: uv run python manage.py migrate --noinput
+      - name: Install browser for journeys
+        run: uv run playwright install --with-deps chromium
+      - name: Tests (unit, integration, race, contract, browser, acceptance)
+        run: uv run pytest -ra --junitxml=test-results/junit.xml
+      - name: Unit-only coverage (reported separately)
+        run: uv run pytest tests/unit tests/contract -q --cov --cov-report=term --cov-report=xml:test-results/coverage-unit.xml
+      - name: Requirement marker reconciliation
+        run: uv run python tools/check_req_markers.py
+      - name: Docstring inventory
+        run: uv run interrogate -v apps/accounts/commands.py apps/clubs/commands.py apps/events/commands.py apps/finance/commands.py apps/memos/commands.py apps/platform_core/commands.py
+      - name: Sphinx documentation
+        run: uv run sphinx-build -W -b html docs/sphinx docs/sphinx/_build/html
+      - name: Production deploy check
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          DJANGO_SECRET_KEY: ci-only-${{ github.run_id }}-a8f3k2m9q4z7x1c5v6b0n3m8l2k4j6h9g1f
+          DJANGO_ALLOWED_HOSTS: townhall.example.org
+          DEMO_AUTH: "false"
+          IUB_ALLOWED_DOMAINS: iub-synthetic.test
+        run: uv run python manage.py check --deploy --fail-level WARNING
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: test-results/

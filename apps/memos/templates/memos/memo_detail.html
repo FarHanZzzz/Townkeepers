@@ -1,0 +1,73 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ memo.reference }}{% endblock %}
+{% block content %}
+<h1>{{ memo.reference }} {{ memo.subject|default:memo.event.title }}</h1>
+<div class="statusbar">
+  <p>{% status_badge memo.get_status_display tone %}{% if current %} · Version {{ current.number }}{% endif %} · Next action: <strong>{{ next_actor }}</strong></p>
+  <p>{{ memo.get_kind_display }}{% if memo.amends %} of <a href="{% url 'memos:detail' memo.amends_id %}">{{ memo.amends.reference }}</a>{% endif %} · {{ memo.club.name }} · Event: <a href="{% url 'events:detail' memo.event_id %}">{{ memo.event.title }}</a> · Template: {{ memo.template_version.label }} v{{ memo.template_version.number }}</p>
+  {% if memo.status == "withdrawn" %}<p>Withdrawn: {{ memo.withdrawn_reason }}</p>{% endif %}
+</div>
+
+{% if current %}
+<h2>Dates for this version</h2>
+<dl class="facts">
+  <dt>Sent to Faculty Advisor</dt><dd>{{ current.submitted_at|local_dt }} by {{ current.submitted_by.full_name }}</dd>
+  <dt>Entered DoSA queue</dt><dd>{{ current.dosa_queue_entered_at|local_dt }}</dd>
+  <dt>Approval deadline</dt><dd>{% if current.approval_deadline %}{{ current.approval_deadline|date:"j M Y" }}{% if memo.status in "pending_advisor pending_additional pending_dosa" and current.approval_deadline < today %} {% status_badge "Overdue" "bad" %}{% endif %}{% else %}{% status_badge "Missing deadline" "warn" %}{% endif %}</dd>
+  <dt>Event starts</dt><dd>{{ current.event_starts_at|local_dt }}</dd>
+  <dt>On-time submission target</dt><dd>{{ current.submission_target|date:"j M Y" }}{% if current.is_late %} {% status_badge "Submitted late" "warn" %} Permission may be declined; the decision stays with the reviewers.{% endif %}</dd>
+  <dt>Content hash</dt><dd><code>{{ current.content_sha256|truncatechars:20 }}</code></dd>
+</dl>
+{% endif %}
+
+<div class="actions">
+  {% if can_review %}<a class="button" href="{% url 'memos:review' memo.pk %}">Review this version</a>{% endif %}
+  {% if is_author and memo.status == "draft" %}<a class="button" href="{% url 'memos:edit' memo.pk %}">Edit draft</a>{% endif %}
+  {% if can_revise %}<form method="post" action="{% url 'memos:revise' memo.pk %}">{% csrf_token %}<button type="submit">Start a revision</button></form>{% endif %}
+  {% if can_amend %}<form method="post" action="{% url 'memos:amend' memo.pk %}" data-confirm="Start an amendment? The approved memo stays in effect until the amendment is approved.">{% csrf_token %}<button type="submit" class="secondary">Request an amendment</button></form>{% endif %}
+  <a class="button secondary" href="{% url 'memos:preview' memo.pk %}">Preview A4</a>
+</div>
+
+{% if can_withdraw %}
+<details class="panel"><summary>Withdraw this memo</summary>
+  <form method="post" action="{% url 'memos:withdraw' memo.pk %}" data-confirm="Withdraw this memo? This cannot be undone.">{% csrf_token %}
+    {% with form=withdraw_form %}{% include "includes/form.html" %}{% endwith %}
+    <button type="submit" class="danger">Withdraw memo</button>
+  </form>
+</details>
+{% endif %}
+
+{% if can_change_deadline %}
+<details class="panel"><summary>Change the approval deadline</summary>
+  <form method="post" action="{% url 'memos:deadline' memo.pk %}">{% csrf_token %}
+    {% with form=deadline_form %}{% include "includes/form.html" %}{% endwith %}
+    <button type="submit" class="secondary">Save deadline</button>
+  </form>
+</details>
+{% endif %}
+
+<h2>Review history</h2>
+{% for v in versions reversed %}
+  <section class="panel" aria-labelledby="ver{{ v.pk }}">
+    <h3 id="ver{{ v.pk }}">Version {{ v.number }} · {{ v.get_stage_display }}</h3>
+    <p>Sent {{ v.submitted_at|local_dt }} by {{ v.submitted_by.full_name }}. <a href="{% url 'memos:preview' memo.pk %}?version={{ v.number }}">View this version</a></p>
+    {% if v.signature_tasks.all %}<p>Additional signers: {% for t in v.signature_tasks.all %}{{ t.signer.full_name }} ({{ t.role_label }}): {{ t.get_status_display }}{% if not forloop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+    {% if v.decisions.all %}
+    <table><thead><tr><th scope="col">Stage</th><th scope="col">Decision</th><th scope="col">By</th><th scope="col">When</th><th scope="col">Reason</th></tr></thead><tbody>
+      {% for d in v.decisions.all %}<tr><td data-label="Stage">{{ d.get_stage_display }}</td><td data-label="Decision">{{ d.get_decision_display }}{% if d.signature_id %} (e-signed){% endif %}</td><td data-label="By">{{ d.actor.full_name }}</td><td data-label="When">{{ d.decided_at|local_dt }}</td><td data-label="Reason">{{ d.reason|default:"Not applicable" }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<p class="empty">No decisions recorded on this version yet.</p>{% endif %}
+  </section>
+{% empty %}
+  <p class="empty">This memo has not been sent yet.</p>
+{% endfor %}
+
+{% if amendments %}<h2>Amendments</h2><ul>{% for a in amendments %}<li><a href="{% url 'memos:detail' a.pk %}">{{ a.reference }}</a> · {{ a.get_status_display }}</li>{% endfor %}</ul>{% endif %}
+
+{% if history %}
+<h2>Audit history</h2>
+<table><thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">By</th><th scope="col">Detail</th></tr></thead><tbody>
+{% for h in history %}<tr><td data-label="When">{{ h.occurred_at|local_dt }}</td><td data-label="Action">{{ h.action }}</td><td data-label="By">{{ h.actor.full_name|default:"System" }}</td><td data-label="Detail">{% if h.reason %}{{ h.reason }}{% else %}{{ h.after }}{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+{% endblock %}

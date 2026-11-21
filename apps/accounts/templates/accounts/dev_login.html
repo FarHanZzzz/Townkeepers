@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Demonstration personas{% endblock %}
+{% block content %}
+<h1>Demonstration personas</h1>
+<p class="warning">Development only. These are synthetic identities seeded by <code>seed_demo</code>. Production settings reject this page.</p>
+{% if personas %}
+<form method="post">{% csrf_token %}
+  <fieldset>
+    <legend>Sign in as</legend>
+    {% for p in personas %}
+      <div class="checkbox"><input type="radio" name="profile_id" id="p{{ p.pk }}" value="{{ p.pk }}"{% if forloop.first %} checked{% endif %}>
+        <label for="p{{ p.pk }}">{{ p.full_name }} · {{ p.get_access_category_display }}{% if p.designation %} · {{ p.designation }}{% endif %}</label></div>
+    {% endfor %}
+  </fieldset>
+  <p><button type="submit">Sign in as selected persona</button></p>
+</form>
+{% else %}
+<p class="empty">No demonstration personas exist. Run <code>uv run python manage.py seed_demo</code>.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Action not completed{% endblock %}
+{% block content %}
+  <h1>Action not completed</h1>
+  <p role="alert">{{ error.message }}</p>
+  {% if error.current_state %}
+    <h2>Current state</h2>
+    <dl class="facts">{% for k, v in error.current_state.items %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}</dl>
+  {% endif %}
+  <p>Nothing was changed by this attempt. Reload the record to see its current state, or <a href="{% url 'dashboard' %}">return to your dashboard</a>.</p>
+{% endblock %}

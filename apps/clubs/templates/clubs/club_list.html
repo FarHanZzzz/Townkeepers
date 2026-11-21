@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Clubs{% endblock %}
+{% block content %}
+<h1>Clubs</h1>
+<div class="actions">
+  {% if can_manage %}<a class="button" href="{% url 'clubs:register' %}">Register a club</a>{% endif %}
+  <a href="{% url 'clubs:archive' %}">EB archive</a>
+</div>
+{% if clubs %}
+<table>
+  <thead><tr><th scope="col">Club</th><th scope="col">Code</th><th scope="col">Status</th></tr></thead>
+  <tbody>{% for c in clubs %}
+    <tr><td data-label="Club"><a href="{% url 'clubs:detail' c.pk %}">{{ c.name }}</a></td><td data-label="Code">{{ c.short_code }}</td>
+      <td data-label="Status">{% if c.is_archived %}{% status_badge "Archived" "neutral" %}{% else %}{% status_badge "Active" "ok" %}{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table>
+{% else %}<p class="empty">No clubs are available in your current scope.</p>{% endif %}
+{% endblock %}

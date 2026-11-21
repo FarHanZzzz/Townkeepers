@@ -1,0 +1,99 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ event.title }}{% endblock %}
+{% block content %}
+<h1>{{ event.title }}</h1>
+<div class="statusbar">
+  <dl class="facts">
+    <dt>Event status</dt><dd>{{ event.get_status_display }}</dd>
+    <dt>Memo status</dt><dd>{% if original %}<a href="{% url 'memos:detail' original.pk %}">{{ original.reference }}</a>: {{ original.get_status_display }}{% else %}Not started{% endif %}</dd>
+    <dt>Booking status</dt><dd>{% if bookings %}{% for b in bookings %}{{ b.venue.name }}: {{ b.get_status_display }}{% if b.status == "pending" %} (next: {{ b.current_step }}){% endif %}{% if not forloop.last %}; {% endif %}{% endfor %}{% else %}Not requested{% endif %}</dd>
+    <dt>Confirmed location</dt><dd>{% for b in bookings %}{% if b.status == "confirmed" %}{{ b.venue.name }}{% endif %}{% empty %}Not confirmed. Proposed: {{ event.proposed_venue|default:"Not recorded" }}{% endfor %}</dd>
+  </dl>
+</div>
+{% if outstanding %}<h2>Outstanding actions</h2><ul>{% for o in outstanding %}<li>{{ o }}</li>{% endfor %}</ul>{% endif %}
+<h2>Details</h2>
+<dl class="facts">
+  <dt>Owner</dt><dd>{{ event.owner_label }}</dd>
+  <dt>Type</dt><dd>{{ event.get_event_type_display }}{% if event.is_big %} · Big event{% endif %}</dd>
+  <dt>Dates (Dhaka)</dt><dd>{{ event.first_date|date:"l j F Y" }}{% if event.last_date != event.first_date %} to {{ event.last_date|date:"l j F Y" }}{% endif %}, {{ event.start_time|time:"g:i A" }} to {{ event.end_time|time:"g:i A" }}</dd>
+  <dt>Expected headcount</dt><dd>{{ event.expected_headcount|default:"Not recorded" }}</dd>
+  <dt>Organizer</dt><dd>{{ event.organizer.full_name }}</dd>
+  <dt>Contact</dt><dd>{{ event.contact|default:"Not recorded" }}</dd>
+  <dt>Description</dt><dd>{{ event.description|default:"Not recorded"|linebreaksbr }}</dd>
+  {% if event.memo_approved_version %}<dt>Memo-approved version</dt><dd>Event version {{ event.memo_approved_version.number }}</dd>{% endif %}
+</dl>
+<div class="actions">
+  {% if editable %}<a class="button secondary" href="{% url 'events:edit' event.pk %}">Edit draft</a>{% endif %}
+  <a class="button secondary" href="{% url 'events:preview' event.pk %}">Preview notice</a>
+  <form method="post" action="{% url 'events:publish' event.pk %}">{% csrf_token %}<input type="hidden" name="destination" value="internal"><input type="hidden" name="operation_key" value="publish-internal-{{ event.pk }}"><button type="submit">Publish internal notice</button></form>
+  <form method="post" action="{% url 'events:publish' event.pk %}">{% csrf_token %}<input type="hidden" name="destination" value="external"><input type="hidden" name="operation_key" value="publish-external-{{ event.pk }}"><button class="secondary" type="submit">Send to external website</button></form>
+  <form method="post" action="{% url 'events:complete' event.pk %}">{% csrf_token %}<input type="hidden" name="operation_key" value="complete-{{ event.pk }}"><button class="secondary" type="submit">Mark completed</button></form>
+</div>
+<form method="post" action="{% url 'events:outcome' event.pk %}" class="panel">{% csrf_token %}
+  <h2>Attendance and outcome</h2>
+  <input type="hidden" name="operation_key" value="outcome-{{ event.pk }}">
+  <div class="field"><label for="attendance">Attendance count, blank if not recorded</label><input id="attendance" name="attendance" value="{{ event.attendance_count|default:'' }}"></div>
+  <div class="field"><label for="note">Note</label><input id="note" name="note" value="{{ event.attendance_note }}"></div>
+  <div class="field"><label for="reach">Reach</label><select id="reach" name="reach"><option>unknown</option><option>campus</option><option>national</option><option>international</option></select></div>
+  <div class="field"><label for="successful">Advisor marks successful</label><select id="successful" name="successful"><option value="no">No</option><option value="yes">Yes</option></select></div>
+  <button class="secondary" type="submit">Save outcome</button>
+</form>
+<div class="actions">
+  {% if can_budget %}<a class="button secondary" href="{% url 'finance:event_budget' event.pk %}">{% if latest_budget %}Budget (version {{ latest_budget.number }}){% else %}Prepare budget{% endif %}</a>{% endif %}
+  {% if can_memo %}<a class="button" href="{% url 'memos:new' %}">Start event-permission memo</a>{% endif %}
+</div>
+{% if original and original.status == "approved" and event.club_id %}
+<section class="panel">
+  <h2>Request a venue</h2>
+  <p class="help">The room is held only after the last confirmation. A large hall needs at least 350 students. Capacities on synthetic venues are not official.</p>
+  <form method="post" action="{% url 'events:book' event.pk %}">
+    {% csrf_token %}
+    <input type="hidden" name="operation_key" value="book-{{ event.pk }}-{{ event.revision }}">
+    <div class="field"><label for="venue">Venue</label>
+      <select id="venue" name="venue">{% for v in venues %}<option value="{{ v.pk }}">{{ v.name }} ({{ v.capacity }})</option>{% endfor %}</select>
+    </div>
+    <div class="field"><label for="first_date">First date</label><input id="first_date" type="date" name="first_date" value="{{ event.first_date|date:'Y-m-d' }}"></div>
+    <div class="field"><label for="last_date">Last date</label><input id="last_date" type="date" name="last_date" value="{{ event.last_date|date:'Y-m-d' }}"></div>
+    <div class="field"><label for="start_time">Start</label><input id="start_time" type="time" name="start_time" value="{{ event.start_time|time:'H:i' }}"></div>
+    <div class="field"><label for="end_time">End</label><input id="end_time" type="time" name="end_time" value="{{ event.end_time|time:'H:i' }}"></div>
+    <div class="field"><label for="headcount">Expected students</label><input id="headcount" name="headcount" value="{{ event.expected_headcount|default:'' }}"></div>
+    <div class="field"><label for="filer_designation">Your designation</label><input id="filer_designation" name="filer_designation" value="{{ user.designation }}"></div>
+    <button type="submit">Submit booking request</button>
+  </form>
+</section>
+{% endif %}
+{% for b in bookings %}
+  {% if b.status == "pending" %}
+  <form class="actions" method="post" action="{% url 'events:booking_decide' b.pk %}">{% csrf_token %}
+    <input type="hidden" name="revision" value="{{ b.revision }}">
+    <input type="hidden" name="operation_key" value="decide-{{ b.pk }}-{{ b.revision }}">
+    <input name="reason" placeholder="Reason, required to return or decline" aria-label="Reason">
+    <button name="decision" value="confirm">Confirm this step</button>
+    <button class="secondary" name="decision" value="return">Return with reason</button>
+    <button class="danger" name="decision" value="decline">Decline</button>
+  </form>
+  {% elif b.status == "confirmed" %}
+  <form class="panel" method="post" action="{% url 'events:booking_move' b.pk %}">{% csrf_token %}
+    <h2>Move booking at {{ b.venue.name }}</h2>
+    <p class="help">If the new time is taken, this reservation stays where it is.</p>
+    <input type="hidden" name="revision" value="{{ b.revision }}">
+    <input type="hidden" name="operation_key" value="move-{{ b.pk }}-{{ b.revision }}">
+    <div class="field"><label for="move-venue-{{ b.pk }}">Venue</label>
+      <select id="move-venue-{{ b.pk }}" name="venue">{% for v in venues %}<option value="{{ v.pk }}"{% if v.pk == b.venue_id %} selected{% endif %}>{{ v.name }}</option>{% endfor %}</select>
+    </div>
+    <div class="field"><label for="move-first-{{ b.pk }}">First date</label><input id="move-first-{{ b.pk }}" type="date" name="first_date" value="{{ b.first_date|date:'Y-m-d' }}"></div>
+    <div class="field"><label for="move-last-{{ b.pk }}">Last date</label><input id="move-last-{{ b.pk }}" type="date" name="last_date" value="{{ b.last_date|date:'Y-m-d' }}"></div>
+    <div class="field"><label for="move-start-{{ b.pk }}">Start</label><input id="move-start-{{ b.pk }}" type="time" name="start_time" value="{{ b.start_time|time:'H:i' }}"></div>
+    <div class="field"><label for="move-end-{{ b.pk }}">End</label><input id="move-end-{{ b.pk }}" type="time" name="end_time" value="{{ b.end_time|time:'H:i' }}"></div>
+    <div class="field"><label for="move-setup-{{ b.pk }}">Setup minutes</label><input id="move-setup-{{ b.pk }}" name="setup_minutes" value="{{ b.setup_minutes }}"></div>
+    <div class="field"><label for="move-cleanup-{{ b.pk }}">Cleanup minutes</label><input id="move-cleanup-{{ b.pk }}" name="cleanup_minutes" value="{{ b.cleanup_minutes }}"></div>
+    <div class="field"><label for="move-head-{{ b.pk }}">Expected students</label><input id="move-head-{{ b.pk }}" name="headcount" value="{{ b.headcount }}"></div>
+    <button type="submit">Move booking</button>
+  </form>
+  {% endif %}
+{% endfor %}
+{% if memos %}
+<h2>Memos</h2>
+<ul>{% for m in memos %}<li><a href="{% url 'memos:detail' m.pk %}">{{ m.reference }}</a> · {{ m.get_kind_display }} · {{ m.get_status_display }}</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Start a memo{% endblock %}
+{% block content %}
+<h1>Start an event-permission memo</h1>
+{% if not has_events %}<p class="empty">No event of your club is ready for a memo. <a href="{% url 'events:new' %}">Create an event</a> first.</p>
+{% elif not has_templates %}<p class="empty">DoSA has not activated a memo template yet.</p>
+{% else %}
+<form method="post" novalidate class="panel">{% csrf_token %}
+  {% include "includes/form.html" %}
+  <div class="actions"><button type="submit">Start draft</button><a href="{% url 'memos:list' %}">Cancel</a></div>
+</form>
+{% endif %}
+{% endblock %}

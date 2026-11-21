@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Memo templates{% endblock %}
+{% block content %}
+<h1>Memo templates</h1>
+<p><a class="button" href="{% url 'memos:template_new' %}">New template</a></p>
+{% if templates %}
+<table><thead><tr><th scope="col">Label</th><th scope="col">Current version</th><th scope="col">Status</th></tr></thead><tbody>
+{% for t in templates %}<tr><td data-label="Label"><a href="{% url 'memos:template_detail' t.pk %}">{{ t.label }}</a></td><td data-label="Current version">{{ t.current_version.number|default:"None" }}</td><td data-label="Status">{% if t.is_active %}{% status_badge "Active" "ok" %}{% else %}{% status_badge "Inactive" "neutral" %}{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p class="empty">No templates yet. Create the event-permission memo template.</p>{% endif %}
+{% endblock %}

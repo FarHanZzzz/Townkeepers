@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Correct archive record{% endblock %}
+{% block content %}
+<h1>Correct archive record</h1>
+<p>{{ object_type|title }}: <strong>{{ record }}</strong> · revision {{ record.revision }}</p>
+<form method="post" novalidate class="panel">{% csrf_token %}
+  {% include "includes/form.html" %}
+  <div class="actions"><button type="submit">Record correction</button><a href="{% url 'clubs:archive' %}">Cancel</a></div>
+</form>
+<h2>Earlier corrections</h2>
+{% if history %}<ul>{% for c in history %}<li>{{ c.corrected_at|local_dt }} · {{ c.field }}: "{{ c.previous_value }}" &rarr; "{{ c.new_value }}" by {{ c.editor.full_name }} · {{ c.reason }}</li>{% endfor %}</ul>
+{% else %}<p class="empty">No corrections recorded.</p>{% endif %}
+{% endblock %}

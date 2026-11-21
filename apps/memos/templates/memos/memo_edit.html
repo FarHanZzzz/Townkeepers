@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Draft {{ memo.reference }}{% endblock %}
+{% block content %}
+<h1>Draft {{ memo.reference }}{% if memo.kind == "amendment" %}: amendment to {{ memo.amends.reference }}{% endif %}</h1>
+<div class="statusbar">
+  <p>Status: <strong>{{ memo.get_status_display }}</strong> · Template: {{ template_version.label }} (version {{ template_version.number }}) · Event: <a href="{% url 'events:detail' memo.event_id %}">{{ memo.event.title }}</a> · Next version: {{ memo.next_version_number }}</p>
+  {% if memo.kind == "amendment" %}<p>The approved memo {{ memo.amends.reference }} stays in effect until this amendment is approved.</p>{% endif %}
+</div>
+{% if newer %}<div class="warning" role="alert"><p>A newer draft (revision {{ newer.revision }}) was saved by someone else. Your entries are kept below; reload the page to compare before saving again.</p></div>{% endif %}
+{% if template_version.instructions %}<div class="panel"><h2>Template instructions</h2><p>{{ template_version.instructions|linebreaksbr }}</p></div>{% endif %}
+<div class="panel">
+  <h2>Recipient guidance</h2>
+  <p><strong>To:</strong> type the intended recipient and designation. <strong>Through:</strong> type the Faculty Advisor's name and designation plus any routing the Advisor instructed. Assigned signers, not the typed lines, decide who signs.</p>
+</div>
+<form method="post" novalidate class="panel">{% csrf_token %}
+  {% include "includes/form.html" %}
+  <div class="actions"><button type="submit">Save draft</button><a href="{% url 'memos:preview' memo.pk %}">Preview A4</a></div>
+</form>
+
+<h2>Attachments</h2>
+{% if attachments %}
+<ul>{% for a in attachments %}<li>{{ a.key }}: <a href="{% url 'platform_core:file' a.file.key %}">{{ a.file.original_name }}</a> ({{ a.file.size|filesizeformat }}){% if a.superseded_at %} · superseded {{ a.superseded_at|local_dt }}{% endif %}</li>{% endfor %}</ul>
+{% else %}<p class="empty">No attachments yet.</p>{% endif %}
+<form method="post" action="{% url 'memos:attach' memo.pk %}" enctype="multipart/form-data" class="panel">{% csrf_token %}
+  {% with form=attachment_form %}{% include "includes/form.html" %}{% endwith %}
+  <button type="submit" class="secondary">Upload attachment</button>
+</form>
+
+<h2>Send to Faculty Advisor</h2>
+{% if problems %}
+  <div class="warning"><p>Complete these before sending:</p><ul>{% for field, msgs in problems.items %}{% for m in msgs %}<li>{{ m }}</li>{% endfor %}{% endfor %}</ul></div>
+{% else %}
+  <p>All required information is present. Sending freezes this content as version {{ memo.next_version_number }}; it becomes read-only during both reviews.</p>
+{% endif %}
+<form method="post" action="{% url 'memos:send' memo.pk %}" data-confirm="Send this memo to the Faculty Advisor? The content will be frozen.">{% csrf_token %}
+  <input type="hidden" name="expected_revision" value="{{ memo.revision }}">
+  <input type="hidden" name="operation_key" value="{{ form.initial.operation_key }}">
+  <button type="submit"{% if problems %} aria-describedby="send-help"{% endif %}>Send to Faculty Advisor</button>
+  {% if problems %}<p class="help" id="send-help">Sending will list any missing items again.</p>{% endif %}
+</form>
+{% endblock %}

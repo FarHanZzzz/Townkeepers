@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Request #{{ req.pk }}{% endblock %}
+{% block content %}
+<h1>Profile correction request #{{ req.pk }}</h1>
+<div class="statusbar"><p>Status: <strong>{{ req.get_status_display }}</strong> · {{ req.get_route_display }}</p></div>
+<dl class="facts">
+  <dt>Requester</dt><dd>{{ req.profile.full_name }} ({{ req.profile.get_access_category_display }})</dd>
+  <dt>Field</dt><dd>{{ label }}</dd>
+  <dt>Value when requested</dt><dd>{{ req.original_value|default:"Not recorded" }}</dd>
+  <dt>Current saved value</dt><dd>{{ current_value|default:"Not recorded" }}</dd>
+  <dt>Proposed value</dt><dd>{{ req.proposed_value }}</dd>
+  <dt>Submitted</dt><dd>{{ req.requested_at|local_dt }}</dd>
+  {% if req.decided_at %}<dt>Decision</dt><dd>{{ req.get_status_display }} by {{ req.decided_by.full_name }} · {{ req.decided_at|local_dt }}{% if req.decision_reason %} · {{ req.decision_reason }}{% endif %}</dd>{% endif %}
+</dl>
+{% if protected_manual %}<p class="warning">Approving records the decision only. Apply the role, assignment, tenure or privilege change through account management or the club page, where the normal controls apply.</p>{% endif %}
+{% if req.status == "pending" %}
+<form method="post" novalidate class="panel">{% csrf_token %}
+  {% include "includes/form.html" %}
+  <button type="submit">Record decision</button>
+</form>
+{% endif %}
+{% endblock %}

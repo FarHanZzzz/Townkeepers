@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Not available{% endblock %}
+{% block content %}
+  <h1>Not available</h1>
+  <p>The requested record is not available. It may not exist, or it may be outside your current access.</p>
+  <p><a href="{% url 'dashboard' %}">Return to your dashboard</a></p>
+{% endblock %}

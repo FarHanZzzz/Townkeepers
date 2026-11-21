@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Calendar{% endblock %}
+{% block content %}
+<h1>Calendar</h1>
+<p class="lede">Confirmed reservations from {{ start|date:"j M Y" }}. A room you cannot open is labelled Reserved.</p>
+<form method="get" class="actions">
+  <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" aria-label="From">
+  <select name="view" aria-label="Range"><option value="week"{% if kind == "week" %} selected{% endif %}>Week</option><option value="month"{% if kind == "month" %} selected{% endif %}>Month</option><option value="list">List</option></select>
+  <button class="secondary" type="submit">Show</button>
+</form>
+{% if rows %}
+<ul class="item-list">{% for row in rows %}<li><div class="item-main">{{ row.venue }} · {{ row.label }}</div><div class="item-side"><time>{{ row.when|date:"j M Y, H:i" }}</time></div></li>{% endfor %}</ul>
+{% else %}<p class="empty">No confirmed reservations in this range.</p>{% endif %}
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Term reports{% endblock %}
+{% block content %}
+<h1>Term reports</h1>
+<p class="lede">Completed events only. Drafts and cancellations are left out. A missing outcome stays unknown.</p>
+<form method="get" class="actions">
+  <label for="club">Club</label>
+  <select id="club" name="club" onchange="this.form.submit()">
+    {% for club in clubs %}<option value="{{ club.pk }}"{% if selected and selected.pk == club.pk %} selected{% endif %}>{{ club.name }}</option>{% endfor %}
+  </select>
+</form>
+{% if rows %}
+<table>
+  <thead><tr><th scope="col">Term</th><th scope="col">Completed</th><th scope="col">Marked successful</th><th scope="col">National or international</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td>{{ row.term.label }}</td>
+      <td><a href="?club={{ selected.pk }}&show=completed">{{ row.completed }}</a></td>
+      <td><a href="?club={{ selected.pk }}&show=successful">{{ row.successful }}</a></td>
+      <td><a href="?club={{ selected.pk }}&show=beyond">{{ row.beyond }}</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">This club has no terms to compare.</p>
+{% endif %}
+{% if opened %}
+<h2>Events in the selected count</h2>
+<ul class="item-list">{% for event in opened %}<li><div class="item-main"><a href="{% url 'events:detail' event.pk %}">{{ event.title }}</a></div></li>{% endfor %}</ul>
+{% endif %}
+<form method="post" action="{% url 'analytics:import_history' %}" class="panel" enctype="multipart/form-data">{% csrf_token %}
+  <h2>Import historical events</h2>
+  <p class="help">CSV columns: club_code, title, first_date, status. A bad row rejects the whole file. Drafts and cancellations are not counted as completed.</p>
+  <div class="field"><label for="file">CSV file</label><input id="file" type="file" name="file" accept=".csv,text/csv" required></div>
+  <button type="submit">Import file</button>
+</form>
+{% endblock %}

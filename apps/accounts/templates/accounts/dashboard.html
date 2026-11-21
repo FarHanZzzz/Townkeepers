@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<header class="page-head">
+  <p class="kicker">Workspace</p>
+  <h1>Dashboard</h1>
+  <p class="lede">{{ user.full_name }} · {{ user.get_access_category_display }}{% if user.designation %} · {{ user.designation }}{% endif %}</p>
+</header>
+<section class="metrics" aria-label="What needs attention">
+  {% for section in sections %}
+    <a class="metric" href="{{ section.more_url|default:'#' }}">
+      <span class="metric-count">{{ section.items|length }}</span>
+      <span class="metric-label">{{ section.title }}</span>
+    </a>
+  {% endfor %}
+</section>
+<div class="board">
+{% for section in sections %}
+  <section class="panel" aria-labelledby="sec{{ forloop.counter }}">
+    <header class="card-head">
+      <h2 id="sec{{ forloop.counter }}">{{ section.title }}</h2>
+      {% if section.more_url %}<a class="button secondary button-sm" href="{{ section.more_url }}">View all</a>{% endif %}
+    </header>
+    {% if section.items %}
+      <ul class="item-list">
+        {% for item in section.items %}
+          <li>
+            <div class="item-main">
+              <a href="{{ item.url }}">{{ item.label }}</a>
+              {% if item.note %}<span class="help">{{ item.note }}</span>{% endif %}
+            </div>
+            <div class="item-side">
+              <span class="badge {{ item.status|status_tone }}">{{ item.status }}</span>
+              {% if item.updated_at %}<time datetime="{{ item.updated_at|date:'c' }}">{{ item.updated_at|date:"j M Y, H:i" }}</time>{% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="empty">{{ section.empty_text }}</p>
+    {% endif %}
+  </section>
+{% endfor %}
+</div>
+{% endblock %}

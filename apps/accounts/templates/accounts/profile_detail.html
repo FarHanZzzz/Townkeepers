@@ -1,0 +1,41 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ profile.full_name }}{% endblock %}
+{% block content %}
+<h1>{{ profile.full_name }}</h1>
+<div class="statusbar"><p>Status: <strong>{% if profile.is_active %}Active{% else %}Inactive since {{ profile.deactivated_at|local_dt }}{% endif %}</strong>{% if profile.is_demo %} · Synthetic demonstration identity{% endif %} · Revision {{ profile.revision }}</p></div>
+<dl class="facts">{% for field, label, value in rows %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>
+
+<h2>Invitation</h2>
+{% if invitation %}<p>Queued {{ invitation.created_at|local_dt }} to {{ invitation.email_address }} · Delivery: {{ invitation.email_status }}</p>
+  {% if can_retry and invitation.email_job and invitation.email_job.state in "failed uncertain retryable" %}
+  <form method="post" action="{% url 'accounts:resend_invitation' profile.pk %}">{% csrf_token %}<button type="submit" class="secondary">Retry invitation email</button></form>{% endif %}
+{% else %}<p>No invitation is recorded.</p>{% endif %}
+
+<h2>Assignments</h2>
+{% if assignments %}<ul>{% for a in assignments %}<li>{{ a.club.name }} · {{ a.designation|default:a.get_kind_display }}{% if a.term %} · {{ a.term.label }} ({{ a.term.get_status_display }}){% endif %} · {{ a.start_date|date:"j M Y" }} to {{ a.end_date|date:"j M Y"|default:"open" }}{% if a.ended_at %} · ended {{ a.ended_at|local_dt }}{% endif %}</li>{% endfor %}</ul>
+{% else %}<p class="empty">No club assignments. DoSA records appointments from the club page.</p>{% endif %}
+
+<h2>Modules and actions</h2>
+{% if can_manage_grants %}
+<form method="post" action="{% url 'accounts:profile_grants' profile.pk %}" class="panel">{% csrf_token %}
+  {% with form=grants_form %}{% include "includes/form.html" %}{% endwith %}
+  <button type="submit">Save privileges</button>
+</form>
+{% elif grants %}<ul>{% for g in grants %}<li>{{ g }}</li>{% endfor %}</ul>{% else %}<p class="empty">No module access.</p>{% endif %}
+
+{% if can_provision %}
+<h2>{% if profile.is_active %}Deactivate{% else %}Reactivate{% endif %} profile</h2>
+<form method="post" action="{% url 'accounts:profile_activation' profile.pk profile.is_active|yesno:'deactivate,reactivate' %}" class="panel" data-confirm="Confirm this status change?">{% csrf_token %}
+  {% with form=activation_form %}{% include "includes/form.html" %}{% endwith %}
+  <button type="submit" class="{% if profile.is_active %}danger{% endif %}">{% if profile.is_active %}Deactivate profile{% else %}Reactivate profile{% endif %}</button>
+  <p class="help">Deactivation ends access immediately and keeps every submission, decision, signature and audit record.</p>
+</form>
+{% endif %}
+
+{% if history %}
+<h2>History</h2>
+<table><thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">By</th><th scope="col">Change</th></tr></thead><tbody>
+{% for h in history %}<tr><td data-label="When">{{ h.occurred_at|local_dt }}</td><td data-label="Action">{{ h.action }}</td><td data-label="By">{{ h.actor.full_name|default:"System" }}</td><td data-label="Change">{{ h.before }} &rarr; {{ h.after }}{% if h.reason %} · {{ h.reason }}{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+{% endblock %}

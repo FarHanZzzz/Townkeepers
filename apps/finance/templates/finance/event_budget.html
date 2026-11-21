@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Budget: {{ event.title }}{% endblock %}
+{% block content %}
+<h1>Budget: {{ event.title }}</h1>
+<p><a href="{% url 'events:detail' event.pk %}">Back to event</a></p>
+{% if latest %}
+<div class="statusbar">
+  <p>Latest: <strong>version {{ latest.number }}</strong> saved by {{ latest.created_by.full_name }} · {{ latest.created_at|local_dt }}</p>
+  <p>Requested amount: {% if latest.requested_amount %}<strong>{{ latest.requested_amount|money:latest.requested_currency }}</strong> for {{ latest.purpose }}{% else %}None requested{% endif %}.
+  Review: {% if latest.review %}<strong>{{ latest.review.get_decision_display }}</strong> by {{ latest.review.reviewer.full_name }} · {{ latest.review.decided_at|local_dt }}{% if latest.review.reason %} · Feedback: {{ latest.review.reason }}{% endif %}{% elif latest.requested_amount %}Awaiting Faculty Advisor review{% else %}Not applicable{% endif %}.</p>
+  <p class="help">An endorsed request is not an allocation or a fund release. Those are recorded separately by DoSA finance.</p>
+</div>
+{% endif %}
+
+{% if review_form %}
+<form method="post" action="{% url 'finance:review_budget' latest.pk %}" class="panel" novalidate>{% csrf_token %}
+  <h2>Review the requested amount</h2>
+  {% with form=review_form %}{% include "includes/form.html" %}{% endwith %}
+  <button type="submit">Record review</button>
+</form>
+{% endif %}
+
+<h2>Versions</h2>
+{% for v in versions %}
+  <section class="panel" aria-labelledby="v{{ v.pk }}">
+    <h3 id="v{{ v.pk }}">Version {{ v.number }}{% if forloop.first %} (latest){% endif %}</h3>
+    {% if v.changed_lines %}<p class="help">Changed lines: {{ v.changed_lines|join:", " }}</p>{% endif %}
+    <table><thead><tr><th scope="col">Line</th><th scope="col">Quantity</th><th scope="col">Planned amount</th></tr></thead><tbody>
+      {% for ln in v.lines.all %}<tr><td data-label="Line">{{ ln.description }}</td><td data-label="Quantity">{% if ln.quantity %}{{ ln.quantity }} {{ ln.unit }}{% else %}Not applicable{% endif %}</td><td data-label="Planned amount">{{ ln.planned_amount|money:ln.currency }}</td></tr>{% endfor %}
+    </tbody></table>
+    <p>Totals: {% for cur, total in v.totals_by_currency.items %}{{ total|money:cur }}{% if not forloop.last %}; {% endif %}{% endfor %} (currencies are never combined)</p>
+  </section>
+{% empty %}
+  <p class="empty">No budget has been saved for this event.</p>
+{% endfor %}
+
+{% if can_edit %}
+<h2>Save a new version</h2>
+<form method="post" novalidate class="panel">{% csrf_token %}
+  {% with form=header %}{% include "includes/form.html" %}{% endwith %}
+  {{ lines.management_form }}
+  <table>
+    <caption>Line items (leave unused rows empty)</caption>
+    <thead><tr><th scope="col">Description</th><th scope="col">Quantity</th><th scope="col">Unit</th><th scope="col">Planned amount</th><th scope="col">Currency</th></tr></thead>
+    <tbody>{% for f in lines %}<tr>
+      <td data-label="Description"><label class="visually-hidden" for="{{ f.description.id_for_label }}">Line {{ forloop.counter }} description</label>{{ f.description }}{{ f.description.errors }}</td>
+      <td data-label="Quantity"><label class="visually-hidden" for="{{ f.quantity.id_for_label }}">Line {{ forloop.counter }} quantity</label>{{ f.quantity }}</td>
+      <td data-label="Unit"><label class="visually-hidden" for="{{ f.unit.id_for_label }}">Line {{ forloop.counter }} unit</label>{{ f.unit }}</td>
+      <td data-label="Planned amount"><label class="visually-hidden" for="{{ f.planned_amount.id_for_label }}">Line {{ forloop.counter }} planned amount</label>{{ f.planned_amount }}{{ f.planned_amount.errors }}</td>
+      <td data-label="Currency"><label class="visually-hidden" for="{{ f.currency.id_for_label }}">Line {{ forloop.counter }} currency</label>{{ f.currency }}</td>
+    </tr>{% endfor %}</tbody>
+  </table>
+  <p><button type="submit">Save budget version</button></p>
+</form>
+{% endif %}
+{% endblock %}

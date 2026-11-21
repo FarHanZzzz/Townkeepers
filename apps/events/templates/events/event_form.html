@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<form method="post" novalidate class="panel">{% csrf_token %}
+  {% include "includes/form.html" %}
+  <div class="actions"><button type="submit">Save draft</button>{% if event %}<a href="{% url 'events:detail' event.pk %}">Cancel</a>{% else %}<a href="{% url 'events:list' %}">Cancel</a>{% endif %}</div>
+</form>
+{% endblock %}

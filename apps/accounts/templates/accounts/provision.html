@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Provision a profile{% endblock %}
+{% block content %}
+<h1>Provision a profile</h1>
+<p>Enter the approved details from the Faculty Advisor's onboarding spreadsheet. A typed designation never grants access; only the checked modules and actions do, within the access category.</p>
+<form method="post" novalidate class="panel">{% csrf_token %}
+  {% include "includes/form.html" %}
+  <div class="actions"><button type="submit">Create profile and send invitation</button><a href="{% url 'accounts:directory' %}">Cancel</a></div>
+</form>
+<details class="panel"><summary>Modules and actions available to each access category</summary>
+  {% for category, actions in ceilings.items %}<h3>{{ category }}</h3>{% if actions %}<ul>{% for a in actions %}<li>{{ a }}</li>{% endfor %}</ul>{% else %}<p>Only signature tasks assigned to this person.</p>{% endif %}{% endfor %}
+</details>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Notice preview{% endblock %}
+{% block content %}
+<h1>{{ event.title }}</h1>
+<p class="lede">This preview is the public notice. Memos, budgets, receipts, and private contacts are not included.</p>
+<dl class="facts">
+  <dt>Schedule</dt><dd>{{ event.first_date|date:"j M Y" }}{% if event.last_date != event.first_date %} to {{ event.last_date|date:"j M Y" }}{% endif %}, {{ event.start_time|time:"g:i A" }} to {{ event.end_time|time:"g:i A" }}</dd>
+  <dt>Venue</dt><dd>{{ venue }}</dd>
+  <dt>Organizer</dt><dd>{{ event.organizer.full_name }}</dd>
+  <dt>Description</dt><dd>{{ event.description|default:"Not recorded" }}</dd>
+</dl>
+<p><a href="{% url 'events:detail' event.pk %}">Back to the event</a></p>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ club.name }}{% endblock %}
+{% block content %}
+<h1>{{ club.name }}</h1>
+<div class="statusbar">
+  <p>Club ID {{ club.pk }} · {{ club.short_code }} · Status: <strong>{{ club.get_status_display }}</strong>{% if club.is_archived %} since {{ club.archived_at|local_dt }}. Archived clubs cannot start new requests.{% endif %}</p>
+  <p>Current term: {% if current %}<strong>{{ current.label }}</strong> ({{ current.start_date|date:"j M Y" }} to {{ current.end_date|date:"j M Y" }}){% else %}<strong>No current term is recorded.</strong> Earlier terms remain available below.{% endif %}</p>
+</div>
+
+<h2>Official profile</h2>
+<p>{{ club.institutional_profile|default:"Not recorded"|linebreaksbr }}</p>
+{% if can_manage %}<p><a href="{% url 'clubs:edit_identity' club.pk %}">Edit official identity</a></p>{% endif %}
+
+<h2>Internal club profile</h2>
+<p>{{ club.description|default:"Not recorded"|linebreaksbr }}</p>
+<h3>Internal contacts</h3>
+<p>{{ club.internal_contacts|default:"Not recorded"|linebreaksbr }}</p>
+{% if can_edit_profile %}<p><a href="{% url 'clubs:internal_profile' club.pk %}">Edit internal profile</a></p>{% endif %}
+
+<h2>Published notices</h2>
+{% if notices %}<ul class="item-list">{% for event in notices %}<li><div class="item-main"><a href="{% url 'events:detail' event.pk %}">{{ event.title }}</a></div><div class="item-side"><span class="help">{{ event.first_date|date:"j M Y" }}</span></div></li>{% endfor %}</ul>{% else %}<p class="empty">No internal notice is published for this club.</p>{% endif %}
+{% if can_manage and current %}
+<form method="post" action="{% url 'clubs:handover' club.pk %}" class="panel">{% csrf_token %}
+  <h2>Hand over the current term</h2>
+  <input type="hidden" name="term" value="{{ current.pk }}">
+  <input type="hidden" name="operation_key" value="handover-{{ current.pk }}">
+  <div class="field"><label for="successor">Successor profile id</label><input id="successor" name="successor" required></div>
+  <div class="field"><label for="handover-reason">Reason</label><input id="handover-reason" name="reason" required></div>
+  <button type="submit">Hand over unfinished work</button>
+</form>
+{% endif %}
+
+<h2 id="organogram">Organogram</h2>
+<form method="get" action="#organogram" class="actions">
+  <label for="term">Term</label>
+  <select id="term" name="term">{% for t in terms %}<option value="{{ t.pk }}"{% if selected and t.pk == selected.pk %} selected{% endif %}>{{ t.label }} ({{ t.get_status_display }})</option>{% endfor %}</select>
+  <button type="submit" class="secondary">Show term</button>
+</form>
+{% if selected %}
+  <p><strong>{{ selected.label }}</strong> · {{ selected.start_date|date:"j M Y" }} to {{ selected.end_date|date:"j M Y" }} · {{ selected.get_status_display }}{% if selected.status == "closed" %} (historical){% endif %}</p>
+  {% if members %}
+  <table>
+    <thead><tr><th scope="col">Position</th><th scope="col">Member</th><th scope="col">Dates</th>{% if can_manage %}<th scope="col">Action</th>{% endif %}</tr></thead>
+    <tbody>{% for m in members %}
+      <tr><td data-label="Position">{{ m.designation }}</td><td data-label="Member">{{ m.profile.full_name }}</td>
+        <td data-label="Dates">{{ m.start_date|date:"j M Y" }} to {{ m.end_date|date:"j M Y"|default:"end of term" }}{% if m.ended_at %} (ended){% endif %}</td>
+        {% if can_manage %}<td data-label="Action">{% if not m.ended_at %}<a href="{% url 'clubs:assignment_end' m.pk %}">End appointment</a>{% elif can_correct and selected.status == "closed" %}<a href="{% url 'clubs:correct' 'assignment' m.pk %}">Correct record</a>{% endif %}</td>{% endif %}</tr>
+    {% endfor %}</tbody>
+  </table>
+  {% else %}<p class="empty">No appointments are recorded for this term.</p>{% endif %}
+  {% if can_manage %}
+  <div class="actions">
+    {% if selected.status != "closed" %}<a class="button secondary" href="{% url 'clubs:appoint' selected.pk %}">Appoint a member</a>{% endif %}
+    {% if selected.status == "upcoming" %}<form method="post" action="{% url 'clubs:term_activate' selected.pk %}">{% csrf_token %}<button type="submit" class="secondary">Activate this term</button></form>{% endif %}
+  </div>
+  {% if selected.status != "closed" %}
+  <form method="post" action="{% url 'clubs:term_close' selected.pk %}" class="panel" data-confirm="Close this term? Members lose access granted through it.">{% csrf_token %}
+    {% with form=close_form %}{% include "includes/form.html" %}{% endwith %}
+    <button type="submit" class="danger">Close term {{ selected.label }}</button>
+  </form>
+  {% endif %}
+  {% endif %}
+{% else %}<p class="empty">No terms are recorded for this club.</p>{% endif %}
+{% if can_manage %}<p><a href="{% url 'clubs:term_new' club.pk %}">Record a new EB term</a></p>{% endif %}
+
+<h2>Faculty Advisors</h2>
+{% if advisors %}<ul>{% for a in advisors %}<li>{{ a.profile.full_name }} · {{ a.start_date|date:"j M Y" }} to {{ a.end_date|date:"j M Y"|default:"open" }}{% if a.ended_at %} (ended){% elif can_manage %} · <a href="{% url 'clubs:assignment_end' a.pk %}">End assignment</a>{% endif %}</li>{% endfor %}</ul>
+{% else %}<p class="empty">No Faculty Advisor is assigned.</p>{% endif %}
+{% if can_manage %}<p><a href="{% url 'clubs:advisor_new' club.pk %}">Assign a Faculty Advisor</a></p>{% endif %}
+
+{% if can_manage and not club.is_archived %}
+<h2>Archive club</h2>
+<form method="post" action="{% url 'clubs:archive_club' club.pk %}" class="panel" data-confirm="Archive this club? It cannot start new requests.">{% csrf_token %}
+  {% with form=archive_form %}{% include "includes/form.html" %}{% endwith %}
+  <button type="submit" class="danger">Archive club</button>
+</form>
+{% endif %}
+
+{% if history %}
+<h2>History</h2>
+<table><thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">By</th><th scope="col">Change</th></tr></thead><tbody>
+{% for h in history %}<tr><td data-label="When">{{ h.occurred_at|local_dt }}</td><td data-label="Action">{{ h.action }}</td><td data-label="By">{{ h.actor.full_name|default:"System" }}</td><td data-label="Change">{{ h.before }} &rarr; {{ h.after }}{% if h.reason %} · {{ h.reason }}{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+{% endblock %}

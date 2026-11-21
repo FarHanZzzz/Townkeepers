@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Workflow settings{% endblock %}
+{% block content %}
+<h1>Workflow settings</h1>
+{% if in_force %}
+<div class="statusbar">
+  <p><strong>In force:</strong> {{ in_force }}. Lead time {{ in_force.standard_lead_days }} days (Big events: {{ in_force.big_event_lead_months }} month{{ in_force.big_event_lead_months|pluralize }}); approval deadline {{ in_force.approval_buffer_days }} days before the event.</p>
+  {% if in_force.is_synthetic %}<p class="warning">These values are synthetic demonstration values until DoSA confirms them (PRD Appendix C.2).</p>{% endif %}
+</div>
+{% endif %}
+<p>A saved version takes effect on its date. Memos already in review keep the version in force when they were submitted.</p>
+<form method="post" novalidate class="panel">{% csrf_token %}
+  {% include "includes/form.html" %}
+  <button type="submit">Save new version</button>
+</form>
+<h2>History</h2>
+<table>
+  <thead><tr><th scope="col">Effective from</th><th scope="col">Lead times</th><th scope="col">Approval buffer</th><th scope="col">Status</th><th scope="col">Saved by</th></tr></thead>
+  <tbody>
+  {% for v in versions %}
+    <tr><td data-label="Effective from">{{ v.effective_from|date:"j M Y" }}</td>
+      <td data-label="Lead times">{{ v.standard_lead_days }} days / {{ v.big_event_lead_months }} month(s)</td>
+      <td data-label="Approval buffer">{{ v.approval_buffer_days }} days</td>
+      <td data-label="Status">{% if v.is_synthetic %}Synthetic{% else %}Confirmed{% endif %}</td>
+      <td data-label="Saved by">{{ v.issued_by.full_name|default:"System (initial)" }} · {{ v.created_at|local_dt }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

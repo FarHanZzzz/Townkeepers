@@ -1,0 +1,132 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Finance{% endblock %}
+{% block content %}
+<h1>Finance</h1>
+<p class="lede">The balance is confirmed releases minus verified expenses. A scheduled release and an unverified bill are not included.</p>
+{% if rows %}
+<table>
+  <thead><tr><th scope="col">Club</th><th scope="col">Recorded balance (BDT)</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr><td>{{ row.club.name }}</td><td>{{ row.balance|money }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No club is in your finance scope.</p>
+{% endif %}
+{% if can_record %}
+<form method="post" action="{% url 'finance:record' %}" class="panel">{% csrf_token %}
+  <h2>Funding period</h2>
+  <input type="hidden" name="action" value="period">
+  <div class="field"><label for="period-label">Label</label><input id="period-label" name="label" required></div>
+  <div class="field"><label for="period-start">Start</label><input id="period-start" type="date" name="start_date" required></div>
+  <div class="field"><label for="period-end">End</label><input id="period-end" type="date" name="end_date" required></div>
+  <button type="submit">Open period</button>
+</form>
+<form method="post" action="{% url 'finance:record' %}" class="panel">{% csrf_token %}
+  <h2>Allocation</h2>
+  <input type="hidden" name="action" value="allocation">
+  <div class="field"><label for="alloc-club">Club</label><select id="alloc-club" name="club">{% for row in rows %}<option value="{{ row.club.pk }}">{{ row.club.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="alloc-period">Period</label><select id="alloc-period" name="period">{% for p in periods %}<option value="{{ p.pk }}">{{ p.label }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="alloc-amount">Amount</label><input id="alloc-amount" name="amount" required></div>
+  <div class="field"><label for="alloc-currency">Currency</label><input id="alloc-currency" name="currency" value="BDT"></div>
+  <div class="field"><label for="alloc-source">Source</label><input id="alloc-source" name="source" required></div>
+  <div class="field"><label for="alloc-date">Date</label><input id="alloc-date" type="date" name="allocated_on" required></div>
+  <button type="submit">Record allocation</button>
+</form>
+<form method="post" action="{% url 'finance:record' %}" class="panel">{% csrf_token %}
+  <h2>Schedule a release</h2>
+  <input type="hidden" name="action" value="schedule">
+  <div class="field"><label for="rel-club">Club</label><select id="rel-club" name="club">{% for row in rows %}<option value="{{ row.club.pk }}">{{ row.club.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="rel-period">Period</label><select id="rel-period" name="period">{% for p in periods %}<option value="{{ p.pk }}">{{ p.label }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="rel-amount">Scheduled amount</label><input id="rel-amount" name="amount" required></div>
+  <div class="field"><label for="rel-currency">Currency</label><input id="rel-currency" name="currency" value="BDT"></div>
+  <button type="submit">Schedule</button>
+</form>
+{% if releases %}
+<h2>Releases</h2>
+<table>
+  <thead><tr><th scope="col">Release</th><th scope="col">Status</th><th scope="col">Confirm or cancel</th><th scope="col">Attribute</th></tr></thead>
+  <tbody>
+  {% for release in releases %}
+    <tr>
+      <td>{{ release.club.name }} · {{ release.currency }} {{ release.scheduled_amount }}{% if release.released_amount %} released {{ release.released_amount }}{% endif %}</td>
+      <td>{{ release.get_status_display }}</td>
+      <td>
+        {% if release.status == "scheduled" %}
+        <form method="post" action="{% url 'finance:record' %}">{% csrf_token %}
+          <input type="hidden" name="action" value="confirm"><input type="hidden" name="release" value="{{ release.pk }}">
+          <input name="amount" aria-label="Released amount for {{ release.pk }}" placeholder="Released amount">
+          <input name="reference" aria-label="Reference for {{ release.pk }}" placeholder="Reference">
+          <button class="button-sm" type="submit">Confirm</button>
+        </form>
+        <form method="post" action="{% url 'finance:record' %}">{% csrf_token %}
+          <input type="hidden" name="action" value="cancel"><input type="hidden" name="release" value="{{ release.pk }}">
+          <input name="reason" aria-label="Cancel reason for {{ release.pk }}" placeholder="Reason">
+          <button class="secondary button-sm" type="submit">Cancel</button>
+        </form>
+        {% endif %}
+      </td>
+      <td>
+        {% if release.status == "released" %}
+        <form method="post" action="{% url 'finance:record' %}">{% csrf_token %}
+          <input type="hidden" name="action" value="attribute"><input type="hidden" name="release" value="{{ release.pk }}">
+          <select name="event" aria-label="Event for release {{ release.pk }}">{% for event in club_events %}{% if event.club_id == release.club_id %}<option value="{{ event.pk }}">{{ event.title }}</option>{% endif %}{% endfor %}</select>
+          <input name="amount" aria-label="Attributed amount for {{ release.pk }}">
+          <button class="secondary button-sm" type="submit">Attribute</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+<form method="post" action="{% url 'finance:record' %}" class="panel">{% csrf_token %}
+  <h2>Currency conversion</h2>
+  <p class="help">Two currencies stay separate until a rate is recorded. The balance still adds only one currency at a time.</p>
+  <input type="hidden" name="action" value="conversion">
+  <div class="field"><label for="from-currency">From</label><input id="from-currency" name="from_currency" value="USD"></div>
+  <div class="field"><label for="to-currency">To</label><input id="to-currency" name="to_currency" value="BDT"></div>
+  <div class="field"><label for="rate">Rate</label><input id="rate" name="rate" required></div>
+  <div class="field"><label for="recorded-on">Date</label><input id="recorded-on" type="date" name="recorded_on" required></div>
+  <div class="field"><label for="conversion-note">Note</label><input id="conversion-note" name="note" required></div>
+  <button type="submit">Record conversion</button>
+</form>
+{% endif %}
+{% if expenses %}
+<h2>Expenses</h2>
+<table>
+  <thead><tr><th scope="col">Expense</th><th scope="col">Status</th><th scope="col">Receipt</th>{% if can_record %}<th scope="col">Review</th>{% endif %}</tr></thead>
+  <tbody>
+  {% for expense in expenses %}
+    <tr>
+      <td>{{ expense.description }} · {{ expense.currency }} {{ expense.amount }}</td>
+      <td>{{ expense.get_status_display }}{% if expense.extraction_state %} · reading {{ expense.extraction_state }}{% endif %}</td>
+      <td>
+        <form method="post" action="{% url 'finance:receipt' expense.pk %}" enctype="multipart/form-data">{% csrf_token %}
+          <input type="file" name="receipt" accept="application/pdf,image/png,image/jpeg" aria-label="Receipt for {{ expense.description }}">
+          <button class="secondary button-sm" type="submit">Attach</button>
+        </form>
+      </td>
+      {% if can_record and expense.status == "submitted" %}
+      <td>
+        <form method="post" action="{% url 'finance:decide_expense' expense.pk %}">{% csrf_token %}
+          <input name="reason" aria-label="Reason for {{ expense.description }}">
+          <button class="button-sm" name="decision" value="verify">Verify</button>
+          <button class="secondary button-sm" name="decision" value="return">Return</button>
+          <button class="danger button-sm" name="decision" value="reject">Reject</button>
+        </form>
+      </td>
+      {% elif can_record %}<td></td>{% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% if periods %}
+<h2>Funding periods</h2>
+<ul class="item-list">{% for p in periods %}<li><div class="item-main">{{ p.label }}</div><div class="item-side"><span class="help">{{ p.start_date|date:"j M Y" }} – {{ p.end_date|date:"j M Y" }}</span></div></li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

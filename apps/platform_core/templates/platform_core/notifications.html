@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<h1>Notifications</h1>
+{% if notices %}
+<table>
+  <caption>Most recent first</caption>
+  <thead><tr><th scope="col">Notice</th><th scope="col">Received</th><th scope="col">Status</th><th scope="col">IUB email</th><th scope="col">Action</th></tr></thead>
+  <tbody>
+  {% for n in notices %}
+    <tr>
+      <td data-label="Notice"><strong>{{ n.subject }}</strong><br>{{ n.message }}</td>
+      <td data-label="Received">{{ n.created_at|local_dt }}</td>
+      <td data-label="Status">{% if n.read_at %}Read{% else %}{% status_badge "Unread" "warn" %}{% endif %}</td>
+      <td data-label="IUB email">{{ n.email_status }}</td>
+      <td data-label="Action">{% if n.link %}<form method="post" action="{% url 'platform_core:notification_open' n.pk %}">{% csrf_token %}<button type="submit" class="secondary">Open record</button></form>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">You have no notifications yet. New submissions, decisions and requests for you appear here.</p>
+{% endif %}
+{% endblock %}

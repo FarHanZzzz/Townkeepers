@@ -1,0 +1,24 @@
+{% load ui %}{% with kind=field|widget_kind %}
+<div class="field{% if field.errors %} has-error{% endif %}">
+  {% if kind == "CheckboxSelectMultiple" or kind == "RadioSelect" %}
+    <fieldset>
+      <legend>{{ field.label }}{% if field.field.required %} <span class="visually-hidden">(required)</span><span aria-hidden="true">*</span>{% endif %}</legend>
+      {% if field.help_text %}<p class="help" id="{{ field.auto_id }}_help">{{ field.help_text }}</p>{% endif %}
+      {% if field.errors %}<ul class="errorlist" id="{{ field.auto_id }}_error">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      {{ field|a11y }}
+    </fieldset>
+  {% elif kind == "CheckboxInput" %}
+    <div class="checkbox">
+      {{ field|a11y }}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    </div>
+    {% if field.help_text %}<p class="help" id="{{ field.auto_id }}_help">{{ field.help_text }}</p>{% endif %}
+    {% if field.errors %}<ul class="errorlist" id="{{ field.auto_id }}_error">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+  {% else %}
+    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="visually-hidden">(required)</span><span aria-hidden="true">*</span>{% endif %}</label>
+    {% if field.help_text %}<p class="help" id="{{ field.auto_id }}_help">{{ field.help_text }}</p>{% endif %}
+    {% if field.errors %}<ul class="errorlist" id="{{ field.auto_id }}_error">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+    {{ field|a11y }}
+  {% endif %}
+</div>
+{% endwith %}

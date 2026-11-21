@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ template.label }}{% endblock %}
+{% block content %}
+<h1>{{ template.label }}</h1>
+<div class="statusbar"><p>Status: <strong>{{ template.is_active|yesno:"Active,Inactive" }}</strong> · Current version {{ template.current_version.number }}</p></div>
+<div class="actions">
+  {% if template.is_active %}
+    <form method="post" action="{% url 'memos:template_active' template.pk 'deactivate' %}" data-confirm="Deactivate? Existing drafts keep their version; new drafts cannot select it.">{% csrf_token %}<button type="submit" class="secondary">Deactivate</button></form>
+  {% else %}
+    <form method="post" action="{% url 'memos:template_active' template.pk 'activate' %}">{% csrf_token %}<button type="submit">Activate</button></form>
+  {% endif %}
+</div>
+<h2>Versions</h2>
+<table><thead><tr><th scope="col">Version</th><th scope="col">Required fields</th><th scope="col">Attachments</th><th scope="col">Signature areas</th><th scope="col">Saved</th></tr></thead><tbody>
+{% for v in versions %}<tr><td data-label="Version">{{ v.number }}</td><td data-label="Required fields">{{ v.required_fields|join:", " }}</td>
+  <td data-label="Attachments">{% for a in v.required_attachments %}{{ a.label }}{% if a.required %} (required){% endif %}{% if not forloop.last %}; {% endif %}{% empty %}None{% endfor %}</td>
+  <td data-label="Signature areas">{{ v.signature_areas|join:", " }}</td><td data-label="Saved">{{ v.created_by.full_name }} · {{ v.created_at|local_dt }}</td></tr>{% endfor %}
+</tbody></table>
+<h2>Save a new version</h2>
+<form method="post" novalidate class="panel">{% csrf_token %}
+  {% include "includes/form.html" %}
+  <button type="submit">Save new version</button>
+</form>
+{% endblock %}

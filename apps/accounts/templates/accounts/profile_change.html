@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Request a change{% endblock %}
+{% block content %}
+<h1>Request a change: {{ label }}</h1>
+<p>Saved value: <strong>{{ current|default:"Not recorded" }}</strong>. It stays in effect while your request is reviewed by {{ route }}.</p>
+<form method="post" novalidate class="panel">{% csrf_token %}
+  {% include "includes/form.html" %}
+  <div class="actions"><button type="submit">Submit request</button><a href="{% url 'accounts:profile' %}">Cancel</a></div>
+</form>
+{% endblock %}

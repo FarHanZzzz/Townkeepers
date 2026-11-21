@@ -1,0 +1,89 @@
+{% extends "base.html" %}{% load ui static %}
+{% block title %}Review {{ memo.reference }}{% endblock %}
+{% block breadcrumbs %}<p><a href="{% url 'memos:list' %}">Memo Management</a> / Pending reviews</p>{% endblock %}
+{% block content %}
+<h1>{{ memo.subject|default:memo.event.title }}</h1>
+<div class="statusbar">
+  <p>Memo {{ memo.reference }} | Submitted version {{ version.number }} | {{ memo.club.name }}</p>
+  <p><strong>{{ memo.get_status_display }}</strong> · Next action: {% if stage == "advisor" %}assigned Faculty Advisor{% elif stage == "additional" %}assigned signer{% else %}DoSA Head{% endif %} (you)</p>
+  {% if version.is_late %}<p class="warning">Submitted after the on-time target of {{ version.submission_target|date:"j M Y" }}. This is a warning; the decision is yours.</p>{% endif %}
+  <p>Approval deadline: {{ version.approval_deadline|date:"j M Y"|default:"Missing" }} · Event starts: {{ version.event_starts_at|local_dt }}</p>
+</div>
+
+<h2>Review this version</h2>
+<details open class="panel"><summary>Event details</summary>
+  <dl class="facts">{% with e=version.snapshot.event %}
+    <dt>Title</dt><dd>{{ e.title }}</dd><dt>Dates (Dhaka)</dt><dd>{{ e.first_date }}{% if e.last_date != e.first_date %} to {{ e.last_date }}{% endif %}, {{ e.start_time|slice:":5" }} to {{ e.end_time|slice:":5" }}</dd>
+    <dt>Proposed venue</dt><dd>{{ e.proposed_venue|default:"Not recorded" }}</dd><dt>Expected headcount</dt><dd>{{ e.expected_headcount|default:"Not recorded" }}</dd>
+    <dt>Big event</dt><dd>{{ e.is_big|yesno:"Yes,No" }}</dd>{% endwith %}
+  </dl>
+</details>
+<details class="panel"><summary>Budget{% if budget %} v{{ budget.number }}{% endif %}</summary>
+  {% if budget %}<ul>{% for ln in budget.lines.all %}<li>{{ ln.description }}: {{ ln.planned_amount|money:ln.currency }}</li>{% endfor %}</ul>
+  <p>Requested: {% if budget.requested_amount %}{{ budget.requested_amount|money:budget.requested_currency }}{% else %}None{% endif %}</p>{% else %}<p>No budget linked.</p>{% endif %}
+</details>
+<details class="panel"><summary>Attachments ({{ attachments|length }})</summary>
+  {% if attachments %}<ul>{% for a in attachments %}<li>{{ a.key }}: <a href="{% url 'platform_core:file' a.file %}">{{ a.name }}</a></li>{% endfor %}</ul>{% else %}<p>No attachments.</p>{% endif %}
+</details>
+<details class="panel"><summary>Earlier feedback</summary>
+  {% if earlier %}<ul>{% for d in earlier %}<li>Version {{ d.version.number }} · {{ d.get_decision_display }} by {{ d.actor.full_name }}: {{ d.reason }}</li>{% endfor %}</ul>{% else %}<p>No earlier feedback.</p>{% endif %}
+</details>
+<details open class="panel"><summary>Memo text</summary>
+  {% with fields=version.snapshot.fields is_draft=False status_label=memo.get_status_display template_label=version.template_version.label blocks=None %}{% include "memos/_memo_body.html" %}{% endwith %}
+</details>
+
+<form method="post" action="{% url 'memos:decisions' memo.pk %}" class="panel" id="approve-form" novalidate>{% csrf_token %}
+  <input type="hidden" name="operation_key" value="{{ operation_key }}">
+  <input type="hidden" name="expected_version" value="{{ version.number }}">
+  <input type="hidden" name="expected_stage" value="{{ stage }}">
+  <input type="hidden" name="decision" value="{{ approve }}">
+  <h2>Signature</h2>
+  <fieldset>
+    <legend>Add e-signature for version {{ version.number }}</legend>
+    <div class="checkbox"><input type="radio" name="signature_method" id="sig-drawn" value="drawn" checked><label for="sig-drawn">Draw my signature</label></div>
+    <div data-signature>
+      <canvas class="signature-pad" aria-label="Signature drawing area. Use a mouse, pen or touch. Keyboard users can choose to type their name instead."></canvas>
+      <input type="hidden" name="signature_data">
+      <button type="button" class="secondary" data-signature-clear>Clear drawing</button>
+    </div>
+    <div class="checkbox"><input type="radio" name="signature_method" id="sig-typed" value="typed"><label for="sig-typed">Type my name instead</label></div>
+    <div class="field"><label for="typed_name">Full name as recorded on your profile</label><input id="typed_name" name="typed_name" autocomplete="name"></div>
+  </fieldset>
+  {% if stage == "advisor" %}
+  <div class="field">
+    <label for="additional_signers">Additional signers (for example the Department Head for an evening classroom)</label>
+    <select id="additional_signers" name="additional_signers" multiple size="4" aria-describedby="signers-help">{% for s in signers %}<option value="{{ s.pk }}">{{ s.full_name }} · {{ s.designation_display }}</option>{% endfor %}</select>
+    <p class="help" id="signers-help">Optional. The DoSA Head receives the memo only after every named signer endorses this version.</p>
+  </div>
+  {% endif %}
+  <div class="checkbox"><input type="checkbox" name="attest" id="attest" value="on"><label for="attest">I confirm I am signing version {{ version.number }} of {{ memo.reference }} as {{ user.full_name }} ({{ user.designation_display }}).</label></div>
+  <p class="help">{% if approve == "confirm" %}Confirm checks the signature and current version, then sends the memo onward.{% elif approve == "endorse" %}Endorse records your signature on this version.{% else %}Approve records the final event permission.{% endif %}</p>
+  <div class="actions">
+    <button type="submit">{{ approve_label }}</button>
+    <button type="button" class="secondary" data-dialog="reject-dialog">{{ reject_label }}</button>
+  </div>
+</form>
+
+<dialog id="reject-dialog" aria-labelledby="reject-h">
+  <form method="post" action="{% url 'memos:decisions' memo.pk %}" novalidate>{% csrf_token %}
+    <h2 id="reject-h">{{ reject_label }}</h2>
+    <input type="hidden" name="operation_key" value="{{ operation_key }}-r">
+    <input type="hidden" name="expected_version" value="{{ version.number }}">
+    <input type="hidden" name="expected_stage" value="{{ stage }}">
+    <input type="hidden" name="decision" value="{{ reject }}">
+    <div class="field"><label for="reason">Reason (sent to the EB{% if stage != "advisor" %} and Faculty Advisor{% endif %})</label><textarea id="reason" name="reason" rows="4" required></textarea></div>
+    <div class="checkbox"><input type="checkbox" id="confirm_reject" name="confirm_reject" value="on"><label for="confirm_reject">I confirm {% if reject == "return" %}returning{% else %}rejecting{% endif %} version {{ version.number }}.</label></div>
+    <div class="actions"><button type="submit" class="danger">{{ reject_label }}</button><button type="button" class="secondary" data-dialog-close>Keep pending</button></div>
+    <p class="help">Dismissing this dialog leaves the memo pending.</p>
+  </form>
+</dialog>
+<noscript><p>Without JavaScript, use the reject form below.</p>
+  <form method="post" action="{% url 'memos:decisions' memo.pk %}">{% csrf_token %}
+    <input type="hidden" name="operation_key" value="{{ operation_key }}-n"><input type="hidden" name="expected_version" value="{{ version.number }}"><input type="hidden" name="expected_stage" value="{{ stage }}"><input type="hidden" name="decision" value="{{ reject }}">
+    <label for="reason-n">Reason</label><textarea id="reason-n" name="reason" rows="3"></textarea>
+    <input type="checkbox" id="confirm-n" name="confirm_reject" value="on"><label for="confirm-n">Confirm</label>
+    <button type="submit">{{ reject_label }}</button>
+  </form>
+</noscript>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/signature.js' %}" defer></script>{% endblock %}

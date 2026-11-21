@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Venues{% endblock %}
+{% block content %}
+<h1>Venues</h1>
+<p class="lede">A synthetic catalogue is labelled. Those capacities and hours are not official IUB figures.</p>
+<p class="actions"><a class="button secondary" href="{% url 'events:availability' %}">Search availability</a> <a class="button secondary" href="{% url 'events:calendar' %}">Calendar</a> <a class="button secondary" href="{% url 'events:suggestions' %}">Slot suggestions</a></p>
+<form method="post" action="{% url 'events:venue_restrict' %}" class="panel">{% csrf_token %}
+  <h2>Restricted hours</h2>
+  <div class="field"><label for="venue">Venue, or blank for every venue</label><select id="venue" name="venue"><option value="">All venues</option>{% for v in venues %}<option value="{{ v.pk }}">{{ v.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="weekday">Weekday (0 Monday, blank for every day)</label><input id="weekday" name="weekday"></div>
+  <div class="field"><label for="local_start">From</label><input id="local_start" type="time" name="local_start" required></div>
+  <div class="field"><label for="local_end">Until</label><input id="local_end" type="time" name="local_end" required></div>
+  <div class="field"><label for="reason">Reason</label><input id="reason" name="reason" required></div>
+  <button type="submit">Save restriction</button>
+</form>
+{% if venues %}
+<table>
+  <thead><tr><th scope="col">Venue</th><th scope="col">Kind</th><th scope="col">Capacity</th><th scope="col">Hours</th><th scope="col">Status</th></tr></thead>
+  <tbody>
+  {% for v in venues %}
+    <tr>
+      <td>{{ v.name }}{% if v.is_synthetic %} <span class="badge badge-neutral">Synthetic</span>{% endif %}<br><span class="help">{{ v.location }}</span></td>
+      <td>{{ v.get_kind_display }}</td>
+      <td>{{ v.capacity }}</td>
+      <td>{{ v.opens_at|time:"g:i A" }} – {{ v.closes_at|time:"g:i A" }}</td>
+      <td>{% if v.is_active %}Active{% else %}Inactive{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No venues are recorded yet.</p>
+{% endif %}
+{% endblock %}

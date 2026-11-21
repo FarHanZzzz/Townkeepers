@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}EB archive{% endblock %}
+{% block content %}
+<h1>EB archive</h1>
+<form method="get" class="panel" role="search">
+  <div class="field"><label for="club">Club</label><select id="club" name="club"><option value="">All clubs in scope</option>{% for c in clubs %}<option value="{{ c.pk }}"{% if c.pk|stringformat:"s" == club_id %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="q">Term label contains</label><input id="q" name="q" value="{{ q }}"></div>
+  <button type="submit" class="secondary">Search archive</button>
+</form>
+{% if terms %}
+<table><thead><tr><th scope="col">Club</th><th scope="col">Term</th><th scope="col">Dates</th><th scope="col">Closed</th><th scope="col">Action</th></tr></thead><tbody>
+{% for t in terms %}<tr><td data-label="Club">{{ t.club.name }}</td><td data-label="Term"><a href="{% url 'clubs:detail' t.club_id %}?term={{ t.pk }}#organogram">{{ t.label }}</a></td>
+  <td data-label="Dates">{{ t.start_date|date:"j M Y" }} to {{ t.end_date|date:"j M Y" }}</td><td data-label="Closed">{{ t.closed_at|date:"j M Y"|default:"Not recorded" }}</td>
+  <td data-label="Action">{% if can_correct %}<a href="{% url 'clubs:correct' 'term' t.pk %}">Correct record</a>{% else %}View only{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p class="empty">No archived terms match these filters. Change the club or term filter to search again.</p>{% endif %}
+{% endblock %}

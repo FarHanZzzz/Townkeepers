@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Accounts{% endblock %}
+{% block content %}
+<h1>Accounts</h1>
+{% if can_provision %}<p><a class="button" href="{% url 'accounts:provision' %}">Provision a profile</a></p>{% endif %}
+<form method="get" class="panel" role="search">
+  <div class="field"><label for="q">Search name or IUB email</label><input id="q" name="q" value="{{ q }}"></div>
+  <div class="field"><label for="category">Access category</label>
+    <select id="category" name="category"><option value="">All</option>{% for v, l in categories %}<option value="{{ v }}"{% if v == category %} selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="status">Status</label>
+    <select id="status" name="status"><option value="">All</option><option value="active"{% if status == "active" %} selected{% endif %}>Active</option><option value="inactive"{% if status == "inactive" %} selected{% endif %}>Inactive</option></select></div>
+  <button type="submit" class="secondary">Apply filters</button>
+</form>
+{% if profiles %}
+<table>
+  <thead><tr><th scope="col">Name</th><th scope="col">IUB email</th><th scope="col">Category</th><th scope="col">Designation</th><th scope="col">Status</th></tr></thead>
+  <tbody>{% for p in profiles %}
+    <tr><td data-label="Name"><a href="{% url 'accounts:profile_detail' p.pk %}">{{ p.full_name }}</a>{% if p.is_demo %} (synthetic){% endif %}</td>
+      <td data-label="IUB email">{{ p.iub_email }}</td><td data-label="Category">{{ p.get_access_category_display }}</td>
+      <td data-label="Designation">{{ p.designation|default:"Not recorded" }}</td><td data-label="Status">{% if p.is_active %}Active{% else %}Inactive{% endif %}</td></tr>
+  {% endfor %}</tbody>
+</table>
+{% else %}<p class="empty">No profiles match these filters. Change the filters to search again.</p>{% endif %}
+{% endblock %}

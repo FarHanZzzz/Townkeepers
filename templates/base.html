@@ -1,0 +1,60 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Amader TOWNHALL{% endblock %} · Amader TOWNHALL</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="{% url 'dashboard' %}">
+        <span class="brand-mark">Amader TOWNHALL</span>
+        <span class="brand-sub">IUB club administration</span>
+      </a>
+      {% if user.is_authenticated %}
+        <nav aria-label="Main">
+          <details class="nav-menu" open>
+            <summary>Menu</summary>
+            <ul>
+              {% for label, url_name in nav_items %}
+                {% url url_name as href %}
+                <li>
+                  <a href="{{ href }}"{% if request.path == href %} aria-current="page"{% endif %}>
+                    <span>{{ label }}</span>
+                    {% if url_name == "platform_core:notifications" and unread_notifications %}<span class="count">{{ unread_notifications }}</span>{% endif %}
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
+        </nav>
+        <div class="sidebar-foot">
+          <div>
+            <p class="user-name">{{ user.full_name }}</p>
+            <p class="user-role">{{ user.designation_display }}</p>
+          </div>
+          <form method="post" action="{% url 'accounts:sign_out' %}">{% csrf_token %}
+            <button type="submit" class="secondary button-sm">Sign out</button>
+          </form>
+        </div>
+      {% endif %}
+    </aside>
+    <div class="workspace">
+      <main id="main" tabindex="-1">
+        {% block breadcrumbs %}{% endblock %}
+        {% if messages %}
+          <div class="messages" role="status" aria-live="polite">
+            {% for message in messages %}<p class="message message-{{ message.tags }}">{{ message }}</p>{% endfor %}
+          </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+  <script src="{% static 'js/app.js' %}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
