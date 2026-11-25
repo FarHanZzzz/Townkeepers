@@ -47,6 +47,17 @@ def money(amount, currency="BDT"):
 
 
 @register.filter
+def audit_detail(value):
+    """Render an audit before/after mapping as 'key: value' pairs instead of Python repr."""
+    if not isinstance(value, dict) or not value:
+        return value if value not in (None, {}) else "—"
+    parts = []
+    for key, item in value.items():
+        parts.append(f"{key}: {item}")
+    return "; ".join(parts)
+
+
+@register.filter
 def status_tone(label):
     """Map a status phrase to a badge tone class. Presentation only."""
     text = str(label or "").casefold()

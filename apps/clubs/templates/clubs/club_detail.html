@@ -79,7 +79,7 @@
 {% if history %}
 <h2>History</h2>
 <table><thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">By</th><th scope="col">Change</th></tr></thead><tbody>
-{% for h in history %}<tr><td data-label="When">{{ h.occurred_at|local_dt }}</td><td data-label="Action">{{ h.action }}</td><td data-label="By">{{ h.actor.full_name|default:"System" }}</td><td data-label="Change">{{ h.before }} &rarr; {{ h.after }}{% if h.reason %} · {{ h.reason }}{% endif %}</td></tr>{% endfor %}
+{% for h in history %}<tr><td data-label="When">{{ h.occurred_at|local_dt }}</td><td data-label="Action">{{ h.action }}</td><td data-label="By">{{ h.actor.full_name|default:"System" }}</td><td data-label="Change">{{ h.before|audit_detail }} &rarr; {{ h.after|audit_detail }}{% if h.reason %} · {{ h.reason }}{% endif %}</td></tr>{% endfor %}
 </tbody></table>
 {% endif %}
 {% endblock %}
