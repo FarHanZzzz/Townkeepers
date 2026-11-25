@@ -7,11 +7,11 @@ from datetime import datetime, timedelta
 from django.contrib import messages
 from django.shortcuts import redirect, render
 
-from apps.platform_core.access import AccessCategory, Action, can, require
+from apps.platform_core.access import AccessCategory, Action, require
 from apps.platform_core.exceptions import DomainError
 
 from . import booking, suggestions
-from .models import BookingRequest, Reservation, Venue
+from .models import BookingRequest, Event, Venue
 from .selectors import get_event
 
 
@@ -20,17 +20,32 @@ def availability_search(request):
     day = request.GET.get("date")
     start = request.GET.get("start") or "18:00"
     end = request.GET.get("end") or "21:00"
+    capacity = request.GET.get("capacity")
+    intended = request.GET.get("use") or ""
     rows = []
     if day:
         on = datetime.strptime(day, "%Y-%m-%d").date()
         start_t = datetime.strptime(start, "%H:%M").time()
         end_t = datetime.strptime(end, "%H:%M").time()
-        for venue in Venue.objects.filter(is_active=True).order_by("name"):
+        venues = Venue.objects.filter(is_active=True).order_by("name")
+        if capacity and capacity.isdigit():
+            venues = venues.filter(capacity__gte=int(capacity))
+        if intended in {Venue.Kind.CLASSROOM, Venue.Kind.LARGE_HALL}:
+            venues = venues.filter(kind=intended)
+        for venue in venues:
             rows.append({"venue": venue, "label": booking.availability(venue, on, start_t, end_t)})
     return render(
         request,
         "events/availability.html",
-        {"rows": rows, "date": day, "start": start, "end": end},
+        {
+            "rows": rows,
+            "date": day,
+            "start": start,
+            "end": end,
+            "capacity": capacity or "",
+            "intended": intended,
+            "venue_kinds": Venue.Kind.choices,
+        },
     )
 
 
@@ -38,29 +53,59 @@ def calendar(request):
     require(request.user, Action.EVENTS_VIEW)
     start = datetime.strptime(request.GET.get("start") or "2026-12-01", "%Y-%m-%d").date()
     kind = request.GET.get("view") or "month"
-    days = 7 if kind == "week" else 31
+    days = 7 if kind == "week" else (31 if kind == "month" else 14)
     end = start + timedelta(days=days)
-    reservations = Reservation.objects.filter(active=True).select_related(
-        "booking__event__club", "venue"
-    )
+    club_id = request.GET.get("club")
+    venue_id = request.GET.get("venue")
+    status = request.GET.get("status") or ""
+    from .selectors import visible_events
+
+    events = visible_events(request.user).filter(first_date__gte=start, first_date__lt=end)
+    if club_id and club_id.isdigit():
+        events = events.filter(club_id=int(club_id))
+    if status in Event.Status.values:
+        events = events.filter(status=status)
+    if venue_id and venue_id.isdigit():
+        events = events.filter(bookings__venue_id=int(venue_id)).distinct()
     rows = []
-    for reservation in reservations:
-        lower = reservation.occupied.lower
-        if lower is None or not (start.toordinal() <= lower.date().toordinal() < end.toordinal()):
-            continue
-        event = reservation.booking.event
-        own = can(request.user, Action.EVENTS_VIEW, event.club)
+    for event in events.select_related("club").order_by("first_date", "start_time"):
+        from apps.platform_core import clock
+
+        when = clock.combine_local(event.first_date, event.start_time)
+        confirmed = (
+            event.bookings.filter(status=BookingRequest.Status.CONFIRMED)
+            .select_related("venue")
+            .first()
+        )
+        venue_name = (
+            confirmed.venue.name if confirmed else (event.proposed_venue or "Not confirmed")
+        )
         rows.append(
             {
-                "when": lower,
-                "venue": reservation.venue.name,
-                "label": event.title if own else "Reserved",
+                "when": when,
+                "venue": venue_name,
+                "label": event.title,
+                "status": event.get_status_display(),
+                "event_id": event.pk,
+                "club": event.owner_label,
             }
         )
+    from apps.clubs.selectors import visible_clubs
+
     return render(
         request,
         "events/calendar.html",
-        {"rows": sorted(rows, key=lambda row: row["when"]), "start": start, "kind": kind},
+        {
+            "rows": sorted(rows, key=lambda row: row["when"]),
+            "start": start,
+            "kind": kind,
+            "club": club_id or "",
+            "venue": venue_id or "",
+            "status": status,
+            "clubs": visible_clubs(request.user, Action.EVENTS_VIEW),
+            "venues": Venue.objects.filter(is_active=True).order_by("name"),
+            "statuses": Event.Status.choices,
+        },
     )
 
 
