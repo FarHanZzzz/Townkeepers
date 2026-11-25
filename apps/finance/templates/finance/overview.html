@@ -138,6 +138,7 @@
       <td>{{ expense.description }} · {{ expense.currency }} {{ expense.amount }}</td>
       <td>{{ expense.get_status_display }}{% if expense.extraction_state %} · reading {{ expense.extraction_state }}{% endif %}</td>
       <td>
+        {% if expense.evidence_key %}<a href="{% url 'platform_core:file' expense.evidence_key %}">View</a><br>{% endif %}
         <form method="post" action="{% url 'finance:receipt' expense.pk %}" enctype="multipart/form-data">{% csrf_token %}
           <input type="file" name="receipt" accept="application/pdf,image/png,image/jpeg" aria-label="Receipt for {{ expense.description }}">
           <button class="secondary button-sm" type="submit">Attach</button>
@@ -153,6 +154,23 @@
         </form>
       </td>
       {% elif can_record %}<td></td>{% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% if adjustments %}
+<h2>Adjustments</h2>
+<table>
+  <thead><tr><th scope="col">When</th><th scope="col">Club</th><th scope="col">Direction</th><th scope="col">Amount</th><th scope="col">Reason</th></tr></thead>
+  <tbody>
+  {% for item in adjustments %}
+    <tr>
+      <td>{{ item.created_at|date:"j M Y" }}</td>
+      <td>{{ item.club.name }}</td>
+      <td>{{ item.get_direction_display }}</td>
+      <td>{{ item.currency }} {{ item.amount }}</td>
+      <td>{{ item.reason }}</td>
     </tr>
   {% endfor %}
   </tbody>

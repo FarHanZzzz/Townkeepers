@@ -12,7 +12,7 @@ from apps.platform_core.forms import apply_domain_error
 
 from . import commands
 from .forms import BudgetHeaderForm, BudgetLineFormSet, BudgetReviewForm
-from .models import BudgetVersion
+from .models import Adjustment, BudgetVersion
 
 
 def event_budget(request, event_id):
@@ -176,6 +176,9 @@ def overview(request):
             "expenses": Expense.objects.filter(club__in=visible_clubs(request.user)).order_by(
                 "-id"
             )[:30],
+            "adjustments": Adjustment.objects.filter(
+                club__in=visible_clubs(request.user)
+            ).order_by("-id")[:30],
             "can_record": request.user.access_category
             in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN},
         },
