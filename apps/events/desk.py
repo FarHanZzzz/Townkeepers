@@ -242,6 +242,10 @@ def venue_restrict(request):
         require(request.user, Action.EVENTS_CREATE_CENTRAL)
     if request.method == "POST":
         try:
+            from datetime import date as _date
+
+            effective_from = request.POST.get("effective_from")
+            effective_until = request.POST.get("effective_until")
             booking.add_restriction(
                 request.user,
                 venue_id=int(request.POST["venue"]) if request.POST.get("venue") else None,
@@ -250,6 +254,8 @@ def venue_restrict(request):
                 local_end=datetime.strptime(request.POST["local_end"], "%H:%M").time(),
                 reason=request.POST.get("reason", ""),
                 operation_key=request.POST.get("operation_key"),
+                effective_from=_date.fromisoformat(effective_from) if effective_from else None,
+                effective_until=_date.fromisoformat(effective_until) if effective_until else None,
             )
             messages.success(request, "Restricted hours recorded.")
         except DomainError as exc:
