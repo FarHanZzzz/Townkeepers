@@ -1,6 +1,5 @@
 """FR-IAM-01/02/04/05/06, UC-01/03/04: sign-in, scope, profile corrections and dashboards."""
 
-
 import pytest
 
 from apps.accounts.commands import (

@@ -119,7 +119,9 @@ def test_a_failed_move_keeps_the_original_reservation(world, head, frozen_clock,
 @pytest.mark.req("FR-AIS-02")
 def test_suggestions_skip_a_confirmed_slot(world, head, frozen_clock, initial_policy):
     room = _room("Suggest room")
-    _confirmed(world, head, room, date(2026, 12, 12), h.make_template(head, label="Suggest template"))
+    _confirmed(
+        world, head, room, date(2026, 12, 12), h.make_template(head, label="Suggest template")
+    )
     taken = suggestions.suggest_slots(
         day=date(2026, 12, 12), start=time(10, 0), duration_minutes=60, headcount=20
     )
