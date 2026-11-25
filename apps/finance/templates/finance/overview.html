@@ -3,6 +3,7 @@
 {% block content %}
 <h1>Finance</h1>
 <p class="lede">The balance is confirmed releases minus verified expenses. A scheduled release and an unverified bill are not included.</p>
+<p class="actions"><a class="button secondary" href="{% url 'finance:reconciliation' %}">Reconciliation report</a></p>
 {% if rows %}
 <table>
   <thead><tr><th scope="col">Club</th><th scope="col">Recorded balance (BDT)</th></tr></thead>

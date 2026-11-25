@@ -176,9 +176,9 @@ def overview(request):
             "expenses": Expense.objects.filter(club__in=visible_clubs(request.user)).order_by(
                 "-id"
             )[:30],
-            "adjustments": Adjustment.objects.filter(
-                club__in=visible_clubs(request.user)
-            ).order_by("-id")[:30],
+            "adjustments": Adjustment.objects.filter(club__in=visible_clubs(request.user)).order_by(
+                "-id"
+            )[:30],
             "can_record": request.user.access_category
             in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN},
         },
@@ -342,6 +342,75 @@ def attach_receipt(request, expense_id: int):
         except DomainError as exc:
             messages.error(request, exc.message)
     return redirect("finance:overview")
+
+
+def reconciliation(request):
+    """Reconciliation report: released, verified, adjusted, and balance per club and event (FR-FIN-03, FR-FIN-11)."""
+    from decimal import Decimal
+
+    from apps.clubs.selectors import visible_clubs
+    from apps.events.models import Event
+
+    from .calculations import club_balance, event_cash_flow
+
+    if not can(request.user, Action.FINANCE_VIEW):
+        from apps.platform_core.exceptions import PermissionDeniedError
+
+        raise PermissionDeniedError()
+    rows = []
+    for club in visible_clubs(request.user):
+        releases = [
+            row.released_amount
+            for row in club.releases.filter(status="released")
+            if row.released_amount is not None
+        ]
+        released_total = sum(releases, start=Decimal("0.00")) if releases else Decimal("0.00")
+        verified_expenses = list(club.expenses.filter(status="verified"))
+        verified_amounts = []
+        for expense in verified_expenses:
+            reduction = sum(
+                item.amount
+                for item in club.adjustments.filter(
+                    direction="reduce_expense", source_id=expense.pk
+                )
+            )
+            verified_amounts.append(expense.amount - reduction)
+        verified_total = sum(verified_amounts, start=Decimal("0.00"))
+        rows.append(
+            {
+                "club": club,
+                "released": released_total,
+                "verified": verified_total,
+                "balance": club_balance(releases, verified_amounts),
+            }
+        )
+    event_rows = []
+    for event in Event.objects.filter(club__in=visible_clubs(request.user)).order_by("title"):
+        inflows = [item.amount for item in event.inflows.all()]
+        inflow_total = sum(inflows, start=Decimal("0.00")) if inflows else Decimal("0.00")
+        verified = []
+        for expense in event.expenses.filter(status="verified"):
+            reduction = sum(
+                item.amount
+                for item in event.adjustments.filter(
+                    direction="reduce_expense", source_id=expense.pk
+                )
+            )
+            verified.append(expense.amount - reduction)
+        verified_total = sum(verified, start=Decimal("0.00"))
+        event_rows.append(
+            {
+                "event": event,
+                "inflow": inflow_total,
+                "verified": verified_total,
+                "cash_flow": event_cash_flow(inflows, verified),
+            }
+        )
+    return render(
+        request,
+        "finance/reconciliation.html",
+        {"rows": rows, "event_rows": event_rows},
+    )
 
 
 def decide_expense(request, expense_id: int):

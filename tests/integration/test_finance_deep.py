@@ -8,3 +8,4 @@ import pytest
 def test_finance_overview_renders(world, head, client):
     client.force_login(head)
     assert client.get("/finance/").status_code == 200
+    assert client.get("/finance/reconciliation/").status_code == 200
