@@ -95,6 +95,39 @@
   <button type="submit">Record conversion</button>
 </form>
 {% endif %}
+<form method="post" action="{% url 'finance:record' %}" class="panel">{% csrf_token %}
+  <h2>Submit expense</h2>
+  <input type="hidden" name="action" value="expense">
+  <div class="field"><label for="exp-club">Club</label><select id="exp-club" name="club">{% for row in rows %}<option value="{{ row.club.pk }}">{{ row.club.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="exp-event">Event</label><select id="exp-event" name="event">{% for event in club_events %}<option value="{{ event.pk }}">{{ event.title }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="exp-amount">Amount</label><input id="exp-amount" name="amount" required></div>
+  <div class="field"><label for="exp-currency">Currency</label><input id="exp-currency" name="currency" value="BDT"></div>
+  <div class="field"><label for="exp-description">Description</label><input id="exp-description" name="description" required></div>
+  <div class="field"><label for="exp-incurred">Incurred on</label><input id="exp-incurred" type="date" name="incurred_on" required></div>
+  <div class="field"><label for="exp-evidence">Receipt note</label><input id="exp-evidence" name="evidence_note" required></div>
+  <button type="submit">Submit expense</button>
+</form>
+{% if can_record %}
+<form method="post" action="{% url 'finance:record' %}" class="panel">{% csrf_token %}
+  <h2>Apply adjustment</h2>
+  <input type="hidden" name="action" value="adjustment">
+  <div class="field"><label for="adj-club">Club</label><select id="adj-club" name="club">{% for row in rows %}<option value="{{ row.club.pk }}">{{ row.club.name }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="adj-event">Event (optional)</label><select id="adj-event" name="event"><option value="">None</option>{% for event in club_events %}<option value="{{ event.pk }}">{{ event.title }}</option>{% endfor %}</select></div>
+  <div class="field"><label for="adj-direction">Direction</label>
+    <select id="adj-direction" name="direction">
+      <option value="reduce_expense">Reduce verified expense</option>
+      <option value="reduce_release">Reduce confirmed release</option>
+    </select>
+  </div>
+  <div class="field"><label for="adj-source-type">Source type</label><input id="adj-source-type" name="source_type" value="expense"></div>
+  <div class="field"><label for="adj-source-id">Source ID</label><input id="adj-source-id" name="source_id" required></div>
+  <div class="field"><label for="adj-amount">Amount</label><input id="adj-amount" name="amount" required></div>
+  <div class="field"><label for="adj-currency">Currency</label><input id="adj-currency" name="currency" value="BDT"></div>
+  <div class="field"><label for="adj-reason">Reason</label><input id="adj-reason" name="reason" required></div>
+  <div class="field"><label for="adj-key">Operation key</label><input id="adj-key" name="operation_key" required></div>
+  <button type="submit">Apply adjustment</button>
+</form>
+{% endif %}
 {% if expenses %}
 <h2>Expenses</h2>
 <table>

@@ -253,6 +253,31 @@ def record(request):
                 note=request.POST.get("note", ""),
                 operation_key=key,
             )
+        elif action == "expense":
+            ledger.submit_expense(
+                request.user,
+                club_id=int(request.POST["club"]),
+                event_id=int(request.POST["event"]) if request.POST.get("event") else None,
+                amount=Decimal(request.POST["amount"]),
+                currency=request.POST.get("currency") or "BDT",
+                description=request.POST.get("description", ""),
+                incurred_on=datetime.strptime(request.POST["incurred_on"], "%Y-%m-%d").date(),
+                evidence_note=request.POST.get("evidence_note", ""),
+                operation_key=key,
+            )
+        elif action == "adjustment":
+            ledger.apply_adjustment(
+                request.user,
+                club_id=int(request.POST["club"]),
+                event_id=int(request.POST["event"]) if request.POST.get("event") else None,
+                direction=request.POST.get("direction", ""),
+                source_type=request.POST.get("source_type", "expense"),
+                source_id=int(request.POST["source_id"]),
+                amount=Decimal(request.POST["amount"]),
+                currency=request.POST.get("currency") or "BDT",
+                reason=request.POST.get("reason", ""),
+                operation_key=key,
+            )
         else:
             messages.error(request, "Choose a finance action.")
             return redirect("finance:overview")
