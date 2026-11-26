@@ -6,7 +6,8 @@ from django.contrib import messages
 from django.shortcuts import redirect, render
 
 from apps.clubs.selectors import visible_clubs
-from apps.platform_core.access import Action, can, effective_actions, require
+from apps.platform_core import clock
+from apps.platform_core.access import AccessCategory, Action, can, effective_actions, require
 from apps.platform_core.exceptions import DomainError
 from apps.platform_core.forms import apply_domain_error
 
@@ -157,7 +158,104 @@ def event_detail(request, pk):
 
 def venue_list(request):
     require(request.user, Action.EVENTS_VIEW)
-    return render(request, "events/venue_list.html", {"venues": Venue.objects.order_by("name")})
+    return render(
+        request,
+        "events/venue_list.html",
+        {
+            "venues": Venue.objects.order_by("name"),
+            "can_manage": request.user.access_category
+            in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN},
+        },
+    )
+
+
+def _venue_form_data(request):
+    from datetime import datetime
+
+    return {
+        "name": request.POST.get("name", "").strip(),
+        "location": request.POST.get("location", "").strip(),
+        "capacity": int(request.POST.get("capacity") or 0),
+        "kind": request.POST.get("kind") or Venue.Kind.CLASSROOM,
+        "facilities": request.POST.get("facilities", "").strip(),
+        "opens_at": datetime.strptime(request.POST.get("opens_at") or "08:00", "%H:%M").time(),
+        "closes_at": datetime.strptime(request.POST.get("closes_at") or "22:00", "%H:%M").time(),
+        "is_active": request.POST.get("is_active") == "on",
+        "is_synthetic": request.POST.get("is_synthetic") == "on",
+    }
+
+
+def venue_new(request):
+    if request.user.access_category not in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN}:
+        require(request.user, Action.EVENTS_CREATE_CENTRAL)
+    if request.method == "POST":
+        try:
+            data = _venue_form_data(request)
+            if not data["name"] or data["capacity"] < 1 or data["opens_at"] >= data["closes_at"]:
+                raise ValueError("invalid")
+            venue = Venue.objects.create(created_at=clock.now(), revision=1, **data)
+            from apps.platform_core import audit
+
+            audit.record(request.user, "venue.create", venue, after={"name": venue.name})
+            messages.success(request, "Venue added.")
+            return redirect("events:venues")
+        except (ValueError, KeyError):
+            messages.error(request, "Enter a name, capacity, and valid opening hours.")
+    return render(request, "events/venue_form.html", {"title": "Add a venue", "venue": None})
+
+
+def venue_edit(request, pk):
+    if request.user.access_category not in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN}:
+        require(request.user, Action.EVENTS_CREATE_CENTRAL)
+    venue = Venue.objects.filter(pk=pk).first()
+    if venue is None:
+        from django.http import Http404
+
+        raise Http404
+    if request.method == "POST":
+        try:
+            data = _venue_form_data(request)
+            if not data["name"] or data["capacity"] < 1 or data["opens_at"] >= data["closes_at"]:
+                raise ValueError("invalid")
+            for field, value in data.items():
+                setattr(venue, field, value)
+            venue.revision += 1
+            venue.save()
+            from apps.platform_core import audit
+
+            audit.record(request.user, "venue.update", venue, after={"name": venue.name})
+            messages.success(request, "Venue updated.")
+            return redirect("events:venues")
+        except (ValueError, KeyError):
+            messages.error(request, "Enter a name, capacity, and valid opening hours.")
+    return render(
+        request, "events/venue_form.html", {"title": f"Edit {venue.name}", "venue": venue}
+    )
+
+
+def venue_block(request):
+    if request.user.access_category not in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN}:
+        require(request.user, Action.EVENTS_CREATE_CENTRAL)
+    if request.method == "POST":
+        from datetime import datetime
+
+        try:
+            from . import booking as booking_commands
+
+            booking_commands.add_block(
+                request.user,
+                venue_id=int(request.POST["venue"]),
+                starts_at=datetime.strptime(request.POST["starts_at"], "%Y-%m-%dT%H:%M"),
+                ends_at=datetime.strptime(request.POST["ends_at"], "%Y-%m-%dT%H:%M"),
+                reason=request.POST.get("reason", ""),
+                operation_key=request.POST.get("operation_key"),
+            )
+            messages.success(request, "Venue block recorded.")
+        except DomainError as exc:
+            messages.error(request, exc.message)
+        except (KeyError, ValueError):
+            messages.error(request, "Enter the venue, interval, and reason.")
+    return redirect("events:venues")
 
 
 def booking_new(request, pk):

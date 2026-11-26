@@ -40,7 +40,6 @@ def _room(**kwargs):
     return Venue.objects.create(**defaults)
 
 
-
 @pytest.mark.req("FR-EVT-05", "FR-EVT-07", "FR-EVT-12", "D-22")
 def test_evening_booking_needs_advisor_then_dosa_and_then_approves_the_event(
     world, head, frozen_clock, initial_policy

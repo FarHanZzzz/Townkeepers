@@ -67,7 +67,7 @@
 {% if history %}
 <h2>Audit history</h2>
 <table><thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">By</th><th scope="col">Detail</th></tr></thead><tbody>
-{% for h in history %}<tr><td data-label="When">{{ h.occurred_at|local_dt }}</td><td data-label="Action">{{ h.action }}</td><td data-label="By">{{ h.actor.full_name|default:"System" }}</td><td data-label="Detail">{% if h.reason %}{{ h.reason }}{% else %}{{ h.after }}{% endif %}</td></tr>{% endfor %}
+{% for h in history %}<tr><td data-label="When">{{ h.occurred_at|local_dt }}</td><td data-label="Action">{{ h.action }}</td><td data-label="By">{{ h.actor.full_name|default:"System" }}</td><td data-label="Detail">{% if h.reason %}{{ h.reason }}{% else %}{{ h.after|audit_detail }}{% endif %}</td></tr>{% endfor %}
 </tbody></table>
 {% endif %}
 {% endblock %}

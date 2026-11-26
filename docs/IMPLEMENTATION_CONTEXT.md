@@ -2,7 +2,7 @@
 
 This is the entry point for any person or model continuing the build. Read it before touching code, and update it in the same change as the code (traceability table, decisions log, next steps).
 
-Last updated: Increments 3-6 have a first working slice (booking, finance totals, internal notices, handover, term counts). Next: deepen each slice (race on two confirmations, OCR file evidence, external publishing, historical import).
+Last updated: Increments 3-6 have a first working slice (booking, finance totals, internal notices, handover, term counts, OCR evidence, external publishing, historical import). The workspace presentation and Nielsen heuristic pass is in the working tree. Quality gate green: 129 tests passing, ruff format/check clean, check_req_markers clean, interrogate 96.8%, sphinx build clean. Next: deepen each slice and complete the remaining analytics and publishing screens.
 
 ---
 

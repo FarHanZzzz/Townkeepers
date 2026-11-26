@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}Reconciliation{% endblock %}
+{% block content %}
+<h1>Reconciliation</h1>
+<p class="lede">Released funds minus verified expenses, grouped by club and event. Scheduled releases and unverified bills are excluded.</p>
+<h2>Clubs</h2>
+{% if rows %}
+<table>
+  <thead><tr><th scope="col">Club</th><th scope="col">Released</th><th scope="col">Verified</th><th scope="col">Balance</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td>{{ row.club.name }}</td>
+      <td>{{ row.released|money }}</td>
+      <td>{{ row.verified|money }}</td>
+      <td>{{ row.balance|money }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="empty">No club is in your finance scope.</p>{% endif %}
+<h2>Events</h2>
+{% if event_rows %}
+<table>
+  <thead><tr><th scope="col">Event</th><th scope="col">Attributed release</th><th scope="col">Verified expense</th><th scope="col">Cash flow</th></tr></thead>
+  <tbody>
+  {% for row in event_rows %}
+    <tr>
+      <td>{{ row.event.title }}</td>
+      <td>{{ row.inflow|money }}</td>
+      <td>{{ row.verified|money }}</td>
+      <td>{{ row.cash_flow|money }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="empty">No events are in your finance scope.</p>{% endif %}
+{% endblock %}
