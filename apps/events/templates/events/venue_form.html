@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<form method="post" class="panel">
+  {% csrf_token %}
+  <div class="field"><label for="name">Name</label><input id="name" name="name" value="{{ venue.name|default:'' }}" required></div>
+  <div class="field"><label for="location">Location</label><input id="location" name="location" value="{{ venue.location|default:'' }}"></div>
+  <div class="field"><label for="capacity">Capacity</label><input id="capacity" type="number" name="capacity" value="{{ venue.capacity|default:'' }}" required></div>
+  <div class="field"><label for="kind">Kind</label>
+    <select id="kind" name="kind">
+      <option value="classroom"{% if venue.kind == "classroom" %} selected{% endif %}>Classroom</option>
+      <option value="large_hall"{% if venue.kind == "large_hall" %} selected{% endif %}>Large hall</option>
+    </select>
+  </div>
+  <div class="field"><label for="facilities">Facilities</label><textarea id="facilities" name="facilities">{{ venue.facilities|default:'' }}</textarea></div>
+  <div class="field"><label for="opens_at">Opens at</label><input id="opens_at" type="time" name="opens_at" value="{{ venue.opens_at|time:'H:i'|default:'08:00' }}"></div>
+  <div class="field"><label for="closes_at">Closes at</label><input id="closes_at" type="time" name="closes_at" value="{{ venue.closes_at|time:'H:i'|default:'22:00' }}"></div>
+  <div class="checkbox"><input id="is_active" type="checkbox" name="is_active"{% if venue.is_active or venue is None %} checked{% endif %}><label for="is_active">Active</label></div>
+  <div class="checkbox"><input id="is_synthetic" type="checkbox" name="is_synthetic"{% if venue.is_synthetic %} checked{% endif %}><label for="is_synthetic">Synthetic catalogue entry</label></div>
+  <div class="actions"><button type="submit">Save venue</button><a href="{% url 'events:venues' %}">Cancel</a></div>
+</form>
+{% endblock %}

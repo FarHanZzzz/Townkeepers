@@ -45,7 +45,7 @@ def test_large_venue_rejects_349_accepts_350_and_rejects_over_capacity():
     assert large_venue_error(1001, 1000)
 
 
-@pytest.mark.req("FR-EVT-05", "D-22")
+@pytest.mark.req("FR-EVT-05")
 def test_evening_classroom_routes_to_advisor_then_dosa_without_a_department_head():
     assert confirmation_route("classroom", date(2026, 12, 16), time(18, 0), time(21, 0)) == (
         "advisor",

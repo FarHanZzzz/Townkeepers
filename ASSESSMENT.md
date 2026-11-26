@@ -32,7 +32,7 @@ This file collects the course evidence required by AGENTS.md section 7, TECHNICA
 | `uv run python manage.py check` | Pass: no issues |
 | `uv run python manage.py makemigrations --check --dry-run` | Pass: no changes detected |
 | `uv run python manage.py migrate --noinput` | Pass |
-| `uv run pytest` | Pass: 105 passed, 0 skipped, 0 failed. One warning comes from the pytest-playwright plugin fixture, not from project code |
+| `uv run pytest` | Pass: 129 passed, 0 skipped, 0 failed. One warning comes from the pytest-playwright plugin fixture, not from project code |
 | `manage.py check --deploy` (production settings, SMTP) | Pass: no issues |
 | `tools/check_req_markers.py` | Pass: no unknown IDs |
 | `sphinx-build -W` | Pass |
@@ -128,7 +128,7 @@ Run on 22 Nov 2026 against local PostgreSQL 17.12 after all code and documentati
 | `uv run python manage.py check` | 0 | System check identified no issues (0 silenced). |
 | `uv run python manage.py makemigrations --check --dry-run` | 0 | No changes detected |
 | `uv run python manage.py migrate --noinput` | 0 | No migrations to apply. |
-| `uv run pytest` | 0 | 105 passed, 1 warning (pytest-playwright plugin) |
+| `uv run pytest` | 0 | 129 passed, 1 warning (pytest-playwright plugin) |
 | `uv run python tools/check_req_markers.py` | 0 | FR 45/91, UC 19/47, AC 12/20, NFR 10/22, BR 4/12 referenced; no unknown IDs |
 | `uv run interrogate apps/*/commands.py` | 0 | PASSED (minimum 90.0%, actual 100.0%) |
 | `uv run sphinx-build -W -b html docs/sphinx docs/sphinx/_build/html` | 0 | Built with no warnings |

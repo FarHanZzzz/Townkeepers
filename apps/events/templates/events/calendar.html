@@ -1,14 +1,48 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% load ui %}
 {% block title %}Calendar{% endblock %}
 {% block content %}
 <h1>Calendar</h1>
-<p class="lede">Confirmed reservations from {{ start|date:"j M Y" }}. A room you cannot open is labelled Reserved.</p>
-<form method="get" class="actions">
-  <input type="date" name="start" value="{{ start|date:'Y-m-d' }}" aria-label="From">
-  <select name="view" aria-label="Range"><option value="week"{% if kind == "week" %} selected{% endif %}>Week</option><option value="month"{% if kind == "month" %} selected{% endif %}>Month</option><option value="list">List</option></select>
-  <button class="secondary" type="submit">Show</button>
+<p class="lede">Events and confirmed reservations from {{ start|date:"j M Y" }}. A room you cannot open is labelled Reserved.</p>
+<form method="get" class="panel">
+  <div class="field"><label for="start">From</label><input id="start" type="date" name="start" value="{{ start|date:'Y-m-d' }}"></div>
+  <div class="field"><label for="view">Range</label>
+    <select id="view" name="view">
+      <option value="week"{% if kind == "week" %} selected{% endif %}>Week</option>
+      <option value="month"{% if kind == "month" %} selected{% endif %}>Month</option>
+      <option value="list"{% if kind == "list" %} selected{% endif %}>List</option>
+    </select>
+  </div>
+  <div class="field"><label for="club">Club</label>
+    <select id="club" name="club">
+      <option value="">All clubs</option>
+      {% for c in clubs %}<option value="{{ c.pk }}"{% if club == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field"><label for="venue">Venue</label>
+    <select id="venue" name="venue">
+      <option value="">All venues</option>
+      {% for v in venues %}<option value="{{ v.pk }}"{% if venue == v.pk|stringformat:"s" %} selected{% endif %}>{{ v.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field"><label for="status">Status</label>
+    <select id="status" name="status">
+      <option value="">All statuses</option>
+      {% for value,label in statuses %}<option value="{{ value }}"{% if status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <button type="submit">Show</button>
 </form>
 {% if rows %}
-<ul class="item-list">{% for row in rows %}<li><div class="item-main">{{ row.venue }} · {{ row.label }}</div><div class="item-side"><time>{{ row.when|date:"j M Y, H:i" }}</time></div></li>{% endfor %}</ul>
-{% else %}<p class="empty">No confirmed reservations in this range.</p>{% endif %}
+<ul class="item-list">
+  {% for row in rows %}
+  <li>
+    <div class="item-main">
+      {% if row.event_id %}<a href="{% url 'events:detail' row.event_id %}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}
+      <span class="item-meta">{{ row.status }} · {{ row.club }} · {{ row.venue }}</span>
+    </div>
+    <div class="item-side"><time>{{ row.when|date:"j M Y, H:i" }}</time></div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}<p class="empty">No events match these filters.</p>{% endif %}
 {% endblock %}

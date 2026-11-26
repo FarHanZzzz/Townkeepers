@@ -3,16 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0c2b">
   <title>{% block title %}Amader TOWNHALL{% endblock %} · Amader TOWNHALL</title>
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
   <div class="shell">
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar" aria-label="Sidebar">
       <a class="brand" href="{% url 'dashboard' %}">
-        <span class="brand-mark">Amader TOWNHALL</span>
-        <span class="brand-sub">IUB club administration</span>
+        <span class="brand-tile" aria-hidden="true">AT</span>
+        <span class="brand-copy">
+          <span class="brand-mark">Amader TOWNHALL</span>
+          <span class="brand-sub">IUB club administration</span>
+        </span>
       </a>
       {% if user.is_authenticated %}
         <nav aria-label="Main">
@@ -24,7 +28,9 @@
                 <li>
                   <a href="{{ href }}"{% if request.path == href %} aria-current="page"{% endif %}>
                     <span>{{ label }}</span>
-                    {% if url_name == "platform_core:notifications" and unread_notifications %}<span class="count">{{ unread_notifications }}</span>{% endif %}
+                    {% if url_name == "platform_core:notifications" and unread_notifications %}
+                      <span class="count" aria-label="{{ unread_notifications }} unread notifications">{{ unread_notifications }}</span>
+                    {% endif %}
                   </a>
                 </li>
               {% endfor %}
@@ -42,7 +48,39 @@
         </div>
       {% endif %}
     </aside>
+
     <div class="workspace">
+      {% if user.is_authenticated %}
+      <header class="topbar">
+        <button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="sidebar" aria-label="Open navigation">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+        <nav class="topbar-crumbs" aria-label="Breadcrumb">
+          <a href="{% url 'dashboard' %}">Workspace</a>
+          <span class="sep" aria-hidden="true">/</span>
+          <span aria-current="page" data-page-title>{% block crumb %}Overview{% endblock %}</span>
+        </nav>
+        <div class="topbar-actions">
+          <button type="button" class="icon-button" data-dialog="quick-jump" title="Jump to a page (press /)">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5 14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <span>Jump to</span>
+            <kbd>/</kbd>
+          </button>
+          <button type="button" class="icon-button" data-dialog="shortcuts" title="Keyboard shortcuts (press ?)" aria-label="Keyboard shortcuts">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.5"/><path d="M6.2 6.2a1.8 1.8 0 1 1 2.4 1.7c-.4.2-.6.5-.6.9v.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".85" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </header>
+      {% else %}
+      <header class="auth-topbar">
+        <span class="brand-tile" aria-hidden="true">AT</span>
+        <span>
+          <span class="auth-name">Amader TOWNHALL</span>
+          <span class="auth-sub">IUB club administration</span>
+        </span>
+      </header>
+      {% endif %}
+
       <main id="main" tabindex="-1">
         {% block breadcrumbs %}{% endblock %}
         {% if messages %}
@@ -54,6 +92,40 @@
       </main>
     </div>
   </div>
+
+  {% if user.is_authenticated %}
+  {# H7 — jump to any destination without hunting through the sidebar #}
+  <dialog id="quick-jump" aria-labelledby="quick-jump-title">
+    <h2 id="quick-jump-title">Jump to</h2>
+    <p class="help">Type to filter, then press Enter.</p>
+    <input type="search" class="dialog-input" id="quick-jump-input" placeholder="Search pages…" autocomplete="off" aria-label="Filter pages" data-autofocus>
+    <ul class="dialog-list" id="quick-jump-list">
+      {% for label, url_name in nav_items %}
+        {% url url_name as href %}
+        <li data-label="{{ label|lower }}"><a href="{{ href }}">{{ label }}{% if url_name == "platform_core:notifications" and unread_notifications %}<span class="hint">{{ unread_notifications }} unread</span>{% endif %}</a></li>
+      {% endfor %}
+    </ul>
+    <div class="actions">
+      <button type="button" class="secondary button-sm" data-dialog-close>Close</button>
+    </div>
+  </dialog>
+
+  {# H10 — documentation the user can reach without leaving the page #}
+  <dialog id="shortcuts" aria-labelledby="shortcuts-title">
+    <h2 id="shortcuts-title">Keyboard shortcuts</h2>
+    <p class="help">These work anywhere in the workspace.</p>
+    <dl class="shortcut-grid">
+      <dt>Jump to a page</dt><dd><kbd>/</kbd></dd>
+      <dt>Show this help</dt><dd><kbd>?</kbd></dd>
+      <dt>Close a dialog</dt><dd><kbd>Esc</kbd></dd>
+      <dt>Go to first field with an error</dt><dd>automatic on submit</dd>
+    </dl>
+    <div class="actions">
+      <button type="button" class="secondary button-sm" data-dialog-close>Close</button>
+    </div>
+  </dialog>
+  {% endif %}
+
   <script src="{% static 'js/app.js' %}" defer></script>
   {% block scripts %}{% endblock %}
 </body>

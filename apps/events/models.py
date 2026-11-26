@@ -161,6 +161,8 @@ class VenueRestriction(models.Model):
     weekday = models.PositiveSmallIntegerField(null=True, blank=True)
     local_start = models.TimeField()
     local_end = models.TimeField()
+    effective_from = models.DateField(null=True, blank=True)
+    effective_until = models.DateField(null=True, blank=True)
     reason = models.CharField(max_length=200)
 
     def __str__(self) -> str:

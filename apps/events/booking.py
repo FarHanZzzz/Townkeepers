@@ -93,8 +93,17 @@ def _restricted(venue: Venue, day: date, start: time, end: time) -> bool:
     for row in rows:
         if row.weekday is not None and row.weekday != day.weekday():
             continue
-        if start < row.local_end and row.local_start < end:
-            return True
+        if row.effective_from and day < row.effective_from:
+            continue
+        if row.effective_until and day > row.effective_until:
+            continue
+        # Overnight restrictions wrap past midnight.
+        if row.local_start < row.local_end:
+            if start < row.local_end and row.local_start < end:
+                return True
+        else:
+            if start < row.local_end or row.local_start < end:
+                return True
     return False
 
 
@@ -446,7 +455,18 @@ def complete_event(actor, event_id: int, *, operation_key):
     )
 
 
-def add_restriction(actor, *, venue_id, weekday, local_start, local_end, reason, operation_key):
+def add_restriction(
+    actor,
+    *,
+    venue_id,
+    weekday,
+    local_start,
+    local_end,
+    reason,
+    operation_key,
+    effective_from=None,
+    effective_until=None,
+):
     """Record a restricted hour. A null venue applies to every venue (FR-EVT-03)."""
 
     def handler():
@@ -462,6 +482,8 @@ def add_restriction(actor, *, venue_id, weekday, local_start, local_end, reason,
             weekday=weekday,
             local_start=local_start,
             local_end=local_end,
+            effective_from=effective_from,
+            effective_until=effective_until,
             reason=reason.strip(),
         )
         audit.record(actor, "venue.restrict", row, reason=reason.strip())
