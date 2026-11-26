@@ -1,6 +1,5 @@
 """AC-15 Account access and role dashboard (PRD Appendix B)."""
 
-
 import pytest
 
 from apps.accounts.commands import ProfileInput, provision_profile

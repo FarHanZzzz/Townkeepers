@@ -62,7 +62,12 @@ def test_two_confirmations_of_one_slot_leave_one_reservation(world, head, frozen
 
     def confirm(booking_id):
         return booking.decide_booking(
-            head, booking_id, decision="confirm", reason="", expected_revision=1, operation_key=f.key()
+            head,
+            booking_id,
+            decision="confirm",
+            reason="",
+            expected_revision=1,
+            operation_key=f.key(),
         )
 
     results, errors = race(lambda: confirm(bookings[0]), lambda: confirm(bookings[1]))
