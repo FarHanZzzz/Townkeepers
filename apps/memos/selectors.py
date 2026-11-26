@@ -11,17 +11,13 @@ from .models import Memo, MemoStatus, MemoVersion, SignatureTask
 
 
 def visible_memos(user) -> QuerySet[Memo]:
-    """Memos in the user's club scope, plus memos where the user holds a signature task."""
+    """All memos are visible to all active profiles."""
     qs = Memo.objects.select_related(
         "club", "event", "template_version", "current_version", "author"
     )
     if not getattr(user, "is_authenticated", False) or not user.is_active:
         return qs.none()
-    scope = club_ids_in_scope(user, Action.MEMOS_VIEW)
-    if scope is None:
-        return qs
-    tasks = Q(versions__signature_tasks__signer=user)
-    return qs.filter(Q(club_id__in=scope) | tasks).distinct()
+    return qs
 
 
 def can_view_memo(user, memo: Memo) -> bool:

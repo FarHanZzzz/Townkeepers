@@ -80,6 +80,36 @@ def cancel_release(actor, release_id: int, *, reason: str, operation_key):
     )
 
 
+def _resolve_active_period(club, allocated_on=None):
+    """Resolve funding period from the club's active term; auto-create if needed."""
+    from apps.clubs.models import Term
+
+    active_term = (
+        Term.objects.filter(club=club, status=Term.Status.ACTIVE).order_by("-start_date").first()
+    )
+    if not active_term:
+        raise ValidationFailed(
+            "This club has no active term. Set an active term before allocating funds.",
+            field_errors={"club": ["This club has no active term."]},
+        )
+    if allocated_on and (allocated_on < active_term.start_date or allocated_on > active_term.end_date):
+        raise ValidationFailed(
+            "Allocation date must fall within the club's active term dates.",
+            field_errors={"allocated_on": ["Date must be within the active term."]},
+        )
+    label = f"{club.short_code} {active_term.label}".strip()[:40]
+    period, _ = FundingPeriod.objects.get_or_create(
+        label=label,
+        defaults={"start_date": active_term.start_date, "end_date": active_term.end_date},
+    )
+    # Keep period dates aligned with the term if term changed.
+    if period.start_date != active_term.start_date or period.end_date != active_term.end_date:
+        period.start_date = active_term.start_date
+        period.end_date = active_term.end_date
+        period.save(update_fields=["start_date", "end_date"])
+    return period
+
+
 def record_allocation(
     actor, *, club_id, period_id, amount, currency, source, allocated_on, operation_key
 ):
@@ -89,15 +119,21 @@ def record_allocation(
         from apps.clubs.models import Club
 
         club = Club.objects.filter(pk=club_id).first()
-        period = FundingPeriod.objects.filter(pk=period_id).first()
-        if club is None or period is None:
+        if club is None:
             raise NotFoundError()
         if actor.access_category not in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN}:
             raise PermissionDeniedError()
         if Decimal(amount) < 0 or not source.strip():
             raise ValidationFailed(
-                field_errors={"amount": ["Enter a zero or positive amount and a source."]}
+                "Enter a zero or positive amount and a source.",
+                field_errors={"amount": ["Enter a zero or positive amount and a source."]},
             )
+        if period_id:
+            period = FundingPeriod.objects.filter(pk=period_id).first()
+            if period is None:
+                raise NotFoundError()
+        else:
+            period = _resolve_active_period(club, allocated_on=allocated_on)
         row = Allocation.objects.create(
             club=club,
             period=period,

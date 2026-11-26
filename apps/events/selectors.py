@@ -2,20 +2,17 @@
 
 from __future__ import annotations
 
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 
-from apps.platform_core.access import Action, club_ids_in_scope
+from apps.platform_core.access import Action
 from apps.platform_core.exceptions import NotFoundError
 
 from .models import Event
 
 
 def visible_events(user, action: str = Action.EVENTS_VIEW) -> QuerySet[Event]:
-    scope = club_ids_in_scope(user, action)
-    qs = Event.objects.select_related("club", "organizer")
-    if scope is None:
-        return qs
-    return qs.filter(Q(club_id__in=scope))
+    """All events are visible to all profiles."""
+    return Event.objects.select_related("club", "organizer")
 
 
 def get_event(user, pk: int, action: str = Action.EVENTS_VIEW) -> Event:

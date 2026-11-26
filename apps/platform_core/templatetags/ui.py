@@ -1,5 +1,6 @@
 """Template helpers for accessible forms and campus-local dates (NFR-USE-02, NFR-LOC-01)."""
 
+import contextlib
 from decimal import Decimal
 
 from django import template
@@ -74,3 +75,19 @@ def status_tone(label):
 def status_badge(label, tone="neutral"):
     """Status as text. Tone is a second cue; the words stay readable without colour (NFR-USE-01)."""
     return format_html('<span class="badge badge-{}">{}</span>', tone, label)
+
+
+@register.simple_tag
+def static_v(path: str) -> str:
+    """Static URL with a file-mtime cache buster, so edited assets are never stale."""
+    from pathlib import Path
+
+    from django.contrib.staticfiles import finders
+    from django.templatetags.static import static
+
+    url = static(path)
+    absolute = finders.find(path)
+    if absolute:
+        with contextlib.suppress(OSError):
+            url = f"{url}?v={int(Path(absolute).stat().st_mtime)}"
+    return url

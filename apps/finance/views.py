@@ -133,19 +133,22 @@ def review_budget(request, version_id):
 
 def overview(request):
     """Club funding for the viewer's clubs (FR-FIN-03)."""
+    from decimal import Decimal
+
     from apps.clubs.selectors import visible_clubs
     from apps.events.models import Event
     from apps.platform_core.access import AccessCategory
 
     from .calculations import club_balance
-    from .models import Expense, FundingPeriod, FundRelease
+    from .models import Allocation, Expense, FundingPeriod, FundRelease
 
     if not can(request.user, Action.FINANCE_VIEW):
         from apps.platform_core.exceptions import PermissionDeniedError
 
         raise PermissionDeniedError()
     rows = []
-    for club in visible_clubs(request.user):
+    clubs = visible_clubs(request.user)
+    for club in clubs:
         releases = [
             row.released_amount
             for row in club.releases.filter(status="released")
@@ -160,25 +163,25 @@ def overview(request):
                 )
             )
             verified_amounts.append(expense.amount - reduction)
-        rows.append({"club": club, "balance": club_balance(releases, verified_amounts)})
+        allocated = sum((a.amount for a in club.allocations.all()), Decimal("0.00"))
+        rows.append(
+            {
+                "club": club,
+                "balance": club_balance(releases, verified_amounts),
+                "allocated": allocated,
+            }
+        )
     return render(
         request,
         "finance/overview.html",
         {
             "rows": rows,
             "periods": FundingPeriod.objects.all(),
-            "releases": FundRelease.objects.filter(club__in=visible_clubs(request.user)).order_by(
-                "-id"
-            )[:30],
-            "club_events": Event.objects.filter(club__in=visible_clubs(request.user)).order_by(
-                "title"
-            )[:100],
-            "expenses": Expense.objects.filter(club__in=visible_clubs(request.user)).order_by(
-                "-id"
-            )[:30],
-            "adjustments": Adjustment.objects.filter(club__in=visible_clubs(request.user)).order_by(
-                "-id"
-            )[:30],
+            "allocations": Allocation.objects.filter(club__in=clubs).select_related("club", "period").order_by("-id")[:30],
+            "releases": FundRelease.objects.filter(club__in=clubs).order_by("-id")[:30],
+            "club_events": Event.objects.filter(club__in=clubs).order_by("title")[:100],
+            "expenses": Expense.objects.filter(club__in=clubs).order_by("-id")[:30],
+            "adjustments": Adjustment.objects.filter(club__in=clubs).order_by("-id")[:30],
             "can_record": request.user.access_category
             in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN},
         },
@@ -204,10 +207,11 @@ def record(request):
                 operation_key=key,
             )
         elif action == "allocation":
+            period_raw = request.POST.get("period")
             ledger.record_allocation(
                 request.user,
                 club_id=int(request.POST["club"]),
-                period_id=int(request.POST["period"]),
+                period_id=int(period_raw) if period_raw else None,
                 amount=Decimal(request.POST["amount"]),
                 currency=request.POST.get("currency") or "BDT",
                 source=request.POST.get("source", ""),

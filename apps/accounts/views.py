@@ -102,10 +102,10 @@ def _demo_enabled() -> bool:
 
 @login_not_required
 def dev_login(request):
-    """Development-only persona picker for synthetic profiles (AC-15 isolation)."""
+    """Development-only persona picker for active profiles."""
     if not _demo_enabled():
         raise Http404
-    personas = Profile.objects.filter(is_demo=True, is_active=True).order_by(
+    personas = Profile.objects.filter(is_active=True).order_by(
         Case(
             When(access_category=AccessCategory.SYSTEM_ADMIN, then=0),
             When(access_category=AccessCategory.DOSA_HEAD, then=1),
@@ -118,7 +118,7 @@ def dev_login(request):
     if request.method == "POST":
         profile = personas.filter(pk=request.POST.get("profile_id")).first()
         if profile is None:
-            messages.error(request, "Choose a demonstration persona.")
+            messages.error(request, "Choose a profile.")
         else:
             login(request, profile, backend=BACKEND)
             audit.record(profile, "session.demo_sign_in", profile)
@@ -154,12 +154,36 @@ def _profile_rows(profile):
         display = getattr(profile, f"get_{field}_display", None)
         value = display() if callable(display) else getattr(profile, field)
         rows.append((field, label, value or "Not recorded"))
+        if field == "designation" and profile.access_category == AccessCategory.FACULTY_ADVISOR:
+            from apps.clubs.models import Assignment
+
+            club_names = list(
+                profile.assignments.filter(
+                    kind=Assignment.Kind.FACULTY_ADVISOR, ended_at__isnull=True
+                )
+                .select_related("club")
+                .order_by("club__name")
+                .values_list("club__name", flat=True)
+                .distinct()
+            )
+            rows.append(
+                ("affiliated_club", "Affiliated club", ", ".join(club_names) or "Not recorded")
+            )
     return rows
+
+
+def _direct_edit_fields(user) -> set[str]:
+    if user.access_category == AccessCategory.DOSA_HEAD:
+        return {f for f, _ in PROFILE_ROWS}
+    if user.access_category in {AccessCategory.EB_MEMBER, AccessCategory.FACULTY_ADVISOR}:
+        return set(commands.ORDINARY_FIELDS)
+    return set()
 
 
 def profile_view(request):
     me = request.user
     affiliations = me.assignments.select_related("club", "term").order_by("-start_date")
+    direct = _direct_edit_fields(me)
     return render(
         request,
         "accounts/profile.html",
@@ -171,6 +195,7 @@ def profile_view(request):
             "grants": sorted(Action(a).label for a in effective_actions(me)),
             "requests": me.change_requests.select_related("decided_by")[:20],
             "protected_fields": commands.PROTECTED_FIELDS,
+            "direct_edit_fields": direct,
         },
     )
 
@@ -180,30 +205,46 @@ def profile_change(request, field):
     if field not in labels:
         raise Http404
     current = getattr(request.user, field, None)
+    direct = field in _direct_edit_fields(request.user)
     if request.method == "POST":
         form = ProfileChangeForm(request.POST, field_name=field)
         if form.is_valid():
             try:
-                commands.request_profile_change(
-                    request.user,
-                    field=field,
-                    proposed_value=form.cleaned_data["proposed_value"],
-                    operation_key=form.cleaned_data["operation_key"],
-                )
-                messages.success(
-                    request,
-                    "Your request is pending review. Your saved details stay in effect until it is decided.",
-                )
+                if direct:
+                    commands.update_own_profile(
+                        request.user,
+                        field=field,
+                        proposed_value=form.cleaned_data["proposed_value"],
+                        operation_key=form.cleaned_data["operation_key"],
+                    )
+                    messages.success(request, "Profile updated.")
+                else:
+                    commands.request_profile_change(
+                        request.user,
+                        field=field,
+                        proposed_value=form.cleaned_data["proposed_value"],
+                        operation_key=form.cleaned_data["operation_key"],
+                    )
+                    messages.success(
+                        request,
+                        "Your request is pending review. Your saved details stay in effect until it is decided.",
+                    )
                 return redirect("accounts:profile")
             except DomainError as exc:
                 apply_domain_error(form, exc)
     else:
         form = ProfileChangeForm(field_name=field)
-    route = "an account administrator" if field in commands.PROTECTED_FIELDS else "the DoSA Head"
+    route = "direct update" if direct else ("an account administrator" if field in commands.PROTECTED_FIELDS else "the DoSA Head")
     return render(
         request,
         "accounts/profile_change.html",
-        {"form": form, "label": labels[field], "current": current, "route": route},
+        {
+            "form": form,
+            "label": labels[field],
+            "current": current,
+            "route": route,
+            "direct": direct,
+        },
     )
 
 
@@ -266,6 +307,8 @@ def provision(request):
                     commands.ProfileInput(**fields, is_demo=bool(data.get("is_demo"))),
                     grants=grants,
                     operation_key=data["operation_key"],
+                    club_id=data.get("club").pk if data.get("club") else None,
+                    term_id=data.get("term").pk if data.get("term") else None,
                 )
                 messages.success(
                     request,
@@ -276,11 +319,19 @@ def provision(request):
                 apply_domain_error(form, exc)
     else:
         form = ProvisionForm(allow_demo=allow_demo)
+    import json
+
+    visible_ceilings = {c: acts for c, acts in CEILING.items() if c != AccessCategory.SIGNER}
     ceilings = {
         AccessCategory(c).label: sorted(Action(a).label for a in acts)
-        for c, acts in CEILING.items()
+        for c, acts in visible_ceilings.items()
     }
-    return render(request, "accounts/provision.html", {"form": form, "ceilings": ceilings})
+    ceilings_json = json.dumps({c: sorted(acts) for c, acts in visible_ceilings.items()})
+    return render(
+        request,
+        "accounts/provision.html",
+        {"form": form, "ceilings": ceilings, "ceilings_json": ceilings_json},
+    )
 
 
 def profile_detail(request, pk):

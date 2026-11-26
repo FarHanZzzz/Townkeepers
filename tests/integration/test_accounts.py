@@ -64,19 +64,20 @@ def test_ineligible_sign_ins_are_denied_without_detail(world, case):
         Profile.objects.filter(pk=target.pk).update(is_active=False)
     elif case == "demo":
         Profile.objects.filter(pk=target.pk).update(is_demo=True)
-    with pytest.raises(SignInDenied):
-        sign_in_with_identity(ident)
+    if case == "wrong_hd":
+        # Domain restriction removed: hosted domain mismatch alone does not block sign-in.
+        assert sign_in_with_identity(ident).pk == target.pk
+    else:
+        with pytest.raises(SignInDenied):
+            sign_in_with_identity(ident)
 
 
 @pytest.mark.req("FR-IAM-01")
 @pytest.mark.django_db
-def test_explicit_test_account_does_not_enable_its_whole_domain(world, settings):
-    settings.EXPLICIT_TEST_ACCOUNTS = ["townkeepers.test.account@gmail.com"]
-    tester = f.make_profile(AccessCategory.EB_MEMBER, email="townkeepers.test.account@gmail.com")
-    assert sign_in_with_identity(identity(tester.iub_email, sub="t1", hd="")).pk == tester.pk
-    f.make_profile(AccessCategory.EB_MEMBER, email="other@gmail.com")
-    with pytest.raises(SignInDenied):
-        sign_in_with_identity(identity("other@gmail.com", sub="t2", hd=""))
+def test_email_domain_restriction_removed(world):
+    """Any valid email can sign in if an active profile exists."""
+    tester = f.make_profile(AccessCategory.EB_MEMBER, email="other@gmail.com")
+    assert sign_in_with_identity(identity(tester.iub_email, sub="t2", hd="")).pk == tester.pk
 
 
 @pytest.mark.req("FR-IAM-01", "UC-01", "NFR-SEC-01")
@@ -111,10 +112,11 @@ def test_signed_out_or_deactivated_session_cannot_reach_protected_pages(world, c
 def test_demo_login_is_isolated_from_live_mode(client, settings, world):
     demo = f.make_profile(AccessCategory.EB_MEMBER, email="demo@townhall.test", is_demo=True)
     assert client.get("/dev/login/").status_code == 200
-    assert (
-        client.post("/dev/login/", {"profile_id": world.president_a.pk}).status_code == 200
-    )  # not a demo persona
-    assert "_auth_user_id" not in client.session
+    # Any active profile can sign in through the dev login page.
+    resp = client.post("/dev/login/", {"profile_id": world.president_a.pk})
+    assert resp.status_code == 302
+    assert int(client.session["_auth_user_id"]) == world.president_a.pk
+    client.logout()
     client.post("/dev/login/", {"profile_id": demo.pk})
     assert int(client.session["_auth_user_id"]) == demo.pk
     settings.DEMO_AUTH = False
@@ -309,6 +311,16 @@ def test_direct_links_to_admin_pages_are_denied(world, client):
 @pytest.mark.req("FR-IAM-03", "UC-02")
 @pytest.mark.django_db
 def test_provisioning_form_creates_profile_and_reports_field_errors(head, client):
+    from apps.clubs.models import Club, Term
+    from apps.platform_core import clock
+
+    club = Club.objects.create(
+        name="Test Club", short_code="TC", created_at=clock.now(), status=Club.Status.ACTIVE
+    )
+    term = Term.objects.create(
+        club=club, label="2026", start_date=clock.local_today(), end_date=clock.local_today(),
+        status=Term.Status.ACTIVE, transition_approved=True, created_by=head, created_at=clock.now(),
+    )
     client.force_login(head)
     page = client.get("/accounts/new/")
     key = page.context["form"].initial["operation_key"]
@@ -321,10 +333,13 @@ def test_provisioning_form_creates_profile_and_reports_field_errors(head, client
             "access_category": "eb_member",
             "department": "na",
             "major": "na",
+            "club": club.pk,
+            "term": term.pk,
             "use_default_grants": "on",
         },
     )
-    assert bad.status_code == 200 and "There is a problem" in bad.content.decode()
+    content = bad.content.decode()
+    assert bad.status_code == 200 and ("There is a problem" in content or "There are problems" in content)
     ok = client.post(
         "/accounts/new/",
         {
@@ -334,6 +349,8 @@ def test_provisioning_form_creates_profile_and_reports_field_errors(head, client
             "access_category": "eb_member",
             "department": "cse",
             "major": "cs",
+            "club": club.pk,
+            "term": term.pk,
             "use_default_grants": "on",
         },
     )

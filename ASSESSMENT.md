@@ -21,7 +21,10 @@ This file collects the course evidence required by AGENTS.md section 7, TECHNICA
 | Increment 2 events and budget | FR-EVT-01/02, FR-FIN-04, UC-11, UC-27 | `/events/...`, `/finance/events/<id>/budget/` | `test_events_budget.py` (8) | `events/0001`, `finance/0001` | Approved-event amendments (Increment 3) |
 | Increment 2 memos | FR-MEM-01 to 13, UC-18 to 26 | `/memos/...`, `POST /memos/<id>/decisions` (form and JSON), `/memos/<id>/preview/`, `/memos/<id>/export` | `test_memos.py` (17), AC-01 (2), AC-13, AC-16, `tests/race` (4), `tests/browser` (1) | `memos/0001` | Event, venue and notice effects of approved amendments (Increments 3 and 5) |
 | Assistance service | TR sections 1, 2, 6; FR-AIS-05/06, FR-AIP-06 | `assistance.app:app`, `assistance.client` | `tests/contract` (9) | None (no database) | Real provider approval (PRD C.2) |
-| Workspace presentation and demonstration fill | FR-IAM-06 | Dashboard template, `static/css/app.css`, `seed_demo` | `seed_demo` against the local database; browser check of the DoSA Head dashboard at 1440px. The full pytest gate was not re-run for this presentation change | None | Sign in as the Advisor, President and Department Head to see their own queues |
+| Workspace presentation and demonstration fill | FR-IAM-06 | Dashboard template, `static/css/app.css`, `seed_demo` | `seed_demo` against the local database; browser check of the DoSA Head dashboard at 1440px. Full gate re-run after the calendar pass (section 9) | None | Sign in as the Advisor, President and Department Head to see their own queues |
+| Calendar workspace | FR-EVT-03, FR-EVT-10, UC-33 | `/events/calendar/`, `/events/calendar-data/`, `/events/venue-availability/`, event and booking forms | `tests/integration/test_calendar_workspace.py` (5), `tests/integration/test_booking_calendar.py` (1), full gate (section 9); browser check of the booking popup at 785 px: four synthetic venues loaded, selection returned date/time/venue, no console errors | None | Week view and separate date filter for FR-EVT-10; screen-reader and phone-width check of the popup |
+| Navigation scope | FR-IAM-06 | Sidebar through `platform_core.context_processors.navigation` | `tests/integration/test_navigation_scope.py` (4); full suite 151 passed | None | Confirm the reduced sidebar for the seeded Advisor and President in a browser |
+| DoSA-only restricted hours | FR-EVT-03 | `/events/venues/restrict/`, Venues screen, `booking.add_restriction` | `tests/integration/test_venue_restriction_scope.py` (11); full suite 151 passed | None | None |
 
 ## 3. Quality gate results (AGENTS.md section 5), PostgreSQL 17
 
@@ -32,7 +35,7 @@ This file collects the course evidence required by AGENTS.md section 7, TECHNICA
 | `uv run python manage.py check` | Pass: no issues |
 | `uv run python manage.py makemigrations --check --dry-run` | Pass: no changes detected |
 | `uv run python manage.py migrate --noinput` | Pass |
-| `uv run pytest` | Pass: 129 passed, 0 skipped, 0 failed. One warning comes from the pytest-playwright plugin fixture, not from project code |
+| `uv run pytest` | Pass: 151 passed, 0 skipped, 0 failed. One warning comes from the pytest-playwright plugin fixture, not from project code |
 | `manage.py check --deploy` (production settings, SMTP) | Pass: no issues |
 | `tools/check_req_markers.py` | Pass: no unknown IDs |
 | `sphinx-build -W` | Pass |
@@ -105,6 +108,10 @@ Inspection by the implementer on synthetic data. A human peer review is still re
 - Raw `18:00:00` times on the review summary, now shown as `18:00`.
 - The confirmation label "I confirm this reject" changed to "I confirm rejecting".
 - Extra top spacing on panel headings.
+- Calendar CSS written in the previous pass contained a UTF-8 BOM and mojibake (`â€”` for `—`); rewritten as plain UTF-8.
+- Superseded first-draft calendar CSS removed, and the new `.cal-legend` markup given a layout rule.
+- Booking forms now start with an empty venue choice; submitting without one opens the picker and marks the field.
+- Browser check showed the popup close button dropping below the title after CSS cleanup; the flex rule was restored.
 
 ## 8. Accessibility, responsive and cross-browser review
 
@@ -119,22 +126,22 @@ Inspection by the implementer on synthetic data. A human peer review is still re
 
 ## 9. Final verification run (this change)
 
-Run on 22 Nov 2026 against local PostgreSQL 17.12 after all code and documentation changes for Increments 1 and 2:
+Run on 27 Nov 2026 against local PostgreSQL 17.12 after the calendar workspace pass and its documentation changes. The previous Increments 1 and 2 run on 22 Nov 2026 is superseded by these numbers:
 
 | Step | Exit | Last line of output |
 |---|---|---|
-| `uv run ruff format --check .` | 0 | 152 files already formatted |
-| `uv run ruff check .` | 0 | All checks passed! |
-| `uv run python manage.py check` | 0 | System check identified no issues (0 silenced). |
-| `uv run python manage.py makemigrations --check --dry-run` | 0 | No changes detected |
-| `uv run python manage.py migrate --noinput` | 0 | No migrations to apply. |
-| `uv run pytest` | 0 | 129 passed, 1 warning (pytest-playwright plugin) |
-| `uv run python tools/check_req_markers.py` | 0 | FR 45/91, UC 19/47, AC 12/20, NFR 10/22, BR 4/12 referenced; no unknown IDs |
-| `uv run interrogate apps/*/commands.py` | 0 | PASSED (minimum 90.0%, actual 100.0%) |
-| `uv run sphinx-build -W -b html docs/sphinx docs/sphinx/_build/html` | 0 | Built with no warnings |
-| `manage.py check --deploy` (production settings, SMTP backend) | 0 | No issues; `DEMO_AUTH=true` correctly fails with `townhall.E001` |
+| `ruff format --check .` | 0 | 185 files already formatted |
+| `ruff check .` | 0 | All checks passed! |
+| `python manage.py check` | 0 | System check identified no issues (0 silenced). |
+| `python manage.py makemigrations --check --dry-run` | 0 | No changes detected |
+| `python manage.py migrate --noinput` | 0 | No migrations to apply. |
+| `pytest` | 0 | 151 passed, 1 warning (pytest-playwright plugin) |
+| `python tools/check_req_markers.py` | 0 | FR 66/91, UC 19/47, AC 15/20, NFR 10/22, BR 4/12 referenced; no unknown IDs |
+| `interrogate apps/*/commands.py` | 0 | PASSED (minimum 90.0%, actual 100.0%) |
+| `sphinx-build -W -b html docs/sphinx docs/sphinx/_build/html` | 0 | Build succeeded, no warnings |
+| `manage.py check --deploy` (production settings, SMTP backend) | not re-run in this pass | Previously passed with no issues; `DEMO_AUTH=true` correctly fails with `townhall.E001` |
 
-Not run: the GitHub Actions pipeline (nothing pushed yet), load tests (NFR-PER-01/02), restore rehearsal (NFR-REL-02), screen-reader and non-Chromium browser reviews.
+The commands were run with `.venv\Scripts\python.exe` and the venv executables because `uv` is not on this machine's PATH. Not run: the GitHub Actions pipeline (nothing pushed yet), load tests (NFR-PER-01/02), restore rehearsal (NFR-REL-02), screen-reader and non-Chromium browser reviews.
 
 ## 10. Peer review, team and Wiki links
 

@@ -10,4 +10,24 @@
 <details class="panel"><summary>Modules and actions available to each access category</summary>
   {% for category, actions in ceilings.items %}<h3>{{ category }}</h3>{% if actions %}<ul>{% for a in actions %}<li>{{ a }}</li>{% endfor %}</ul>{% else %}<p>Only signature tasks assigned to this person.</p>{% endif %}{% endfor %}
 </details>
+<script>
+(function () {
+  var ceilings = {{ ceilings_json|safe }};
+  var cat = document.querySelector('[name="access_category"]');
+  var useDefault = document.querySelector('[name="use_default_grants"]');
+  function apply() {
+    if (!cat) return;
+    var allowed = ceilings[cat.value] || [];
+    if (useDefault) useDefault.checked = false;
+    document.querySelectorAll('input[name="grants"]').forEach(function (cb) {
+      cb.checked = allowed.indexOf(cb.value) !== -1;
+    });
+  }
+  if (cat) {
+    cat.addEventListener('change', apply);
+    var anyChecked = !!document.querySelector('input[name="grants"]:checked');
+    if (!anyChecked) apply();
+  }
+})();
+</script>
 {% endblock %}

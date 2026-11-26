@@ -3,7 +3,8 @@
 {% block content %}
 <h1>Venues</h1>
 <p class="lede">A synthetic catalogue is labelled. Those capacities and hours are not official IUB figures.</p>
-<p class="actions"><a class="button secondary" href="{% url 'events:availability' %}">Search availability</a> <a class="button secondary" href="{% url 'events:calendar' %}">Calendar</a> <a class="button secondary" href="{% url 'events:suggestions' %}">Slot suggestions</a>{% if can_manage %} <a class="button" href="{% url 'events:venue_new' %}">Add venue</a>{% endif %}</p>
+<p class="actions"><a class="button secondary" href="{% url 'events:calendar' %}">Calendar</a>{% if can_manage %} <a class="button" href="{% url 'events:venue_new' %}">Add venue</a>{% endif %}</p>
+{% if can_restrict %}
 <form method="post" action="{% url 'events:venue_restrict' %}" class="panel">{% csrf_token %}
   <h2>Restricted hours</h2>
   <div class="field"><label for="venue">Venue, or blank for every venue</label><select id="venue" name="venue"><option value="">All venues</option>{% for v in venues %}<option value="{{ v.pk }}">{{ v.name }}</option>{% endfor %}</select></div>
@@ -15,6 +16,7 @@
   <div class="field"><label for="reason">Reason</label><input id="reason" name="reason" required></div>
   <button type="submit">Save restriction</button>
 </form>
+{% endif %}
 {% if can_manage %}
 <form method="post" action="{% url 'events:venue_block' %}" class="panel">{% csrf_token %}
   <h2>Venue block or central activity</h2>

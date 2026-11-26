@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from django.contrib import messages
 from django.shortcuts import redirect, render
 
 from apps.platform_core.access import AccessCategory, Action, require
-from apps.platform_core.exceptions import DomainError
+from apps.platform_core.exceptions import DomainError, PermissionDeniedError
 
 from . import booking, suggestions
-from .models import BookingRequest, Event, Venue
+from .models import BookingRequest, Venue
 from .selectors import get_event
 
 
@@ -45,66 +45,6 @@ def availability_search(request):
             "capacity": capacity or "",
             "intended": intended,
             "venue_kinds": Venue.Kind.choices,
-        },
-    )
-
-
-def calendar(request):
-    require(request.user, Action.EVENTS_VIEW)
-    start = datetime.strptime(request.GET.get("start") or "2026-12-01", "%Y-%m-%d").date()
-    kind = request.GET.get("view") or "month"
-    days = 7 if kind == "week" else (31 if kind == "month" else 14)
-    end = start + timedelta(days=days)
-    club_id = request.GET.get("club")
-    venue_id = request.GET.get("venue")
-    status = request.GET.get("status") or ""
-    from .selectors import visible_events
-
-    events = visible_events(request.user).filter(first_date__gte=start, first_date__lt=end)
-    if club_id and club_id.isdigit():
-        events = events.filter(club_id=int(club_id))
-    if status in Event.Status.values:
-        events = events.filter(status=status)
-    if venue_id and venue_id.isdigit():
-        events = events.filter(bookings__venue_id=int(venue_id)).distinct()
-    rows = []
-    for event in events.select_related("club").order_by("first_date", "start_time"):
-        from apps.platform_core import clock
-
-        when = clock.combine_local(event.first_date, event.start_time)
-        confirmed = (
-            event.bookings.filter(status=BookingRequest.Status.CONFIRMED)
-            .select_related("venue")
-            .first()
-        )
-        venue_name = (
-            confirmed.venue.name if confirmed else (event.proposed_venue or "Not confirmed")
-        )
-        rows.append(
-            {
-                "when": when,
-                "venue": venue_name,
-                "label": event.title,
-                "status": event.get_status_display(),
-                "event_id": event.pk,
-                "club": event.owner_label,
-            }
-        )
-    from apps.clubs.selectors import visible_clubs
-
-    return render(
-        request,
-        "events/calendar.html",
-        {
-            "rows": sorted(rows, key=lambda row: row["when"]),
-            "start": start,
-            "kind": kind,
-            "club": club_id or "",
-            "venue": venue_id or "",
-            "status": status,
-            "clubs": visible_clubs(request.user, Action.EVENTS_VIEW),
-            "venues": Venue.objects.filter(is_active=True).order_by("name"),
-            "statuses": Event.Status.choices,
         },
     )
 
@@ -238,8 +178,9 @@ def slot_suggestions(request):
 
 
 def venue_restrict(request):
-    if request.user.access_category not in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN}:
-        require(request.user, Action.EVENTS_CREATE_CENTRAL)
+    require(request.user, Action.EVENTS_VIEW)
+    if request.user.access_category != AccessCategory.DOSA_HEAD:
+        raise PermissionDeniedError()
     if request.method == "POST":
         try:
             from datetime import date as _date

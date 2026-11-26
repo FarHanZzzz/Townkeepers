@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Demonstration personas{% endblock %}
+{% block title %}Sign in as a profile{% endblock %}
 {% block content %}
-<h1>Demonstration personas</h1>
-<p class="warning">Development only. These are synthetic identities seeded by <code>seed_demo</code>. Production settings reject this page.</p>
+<h1>Sign in as a profile</h1>
+<p class="warning">Development only. Active profiles, including those created by DoSA/System Admin, appear here. Production settings reject this page.</p>
 {% if personas %}
 <form method="post">{% csrf_token %}
   <fieldset>
@@ -12,9 +12,9 @@
         <label for="p{{ p.pk }}">{{ p.full_name }} · {{ p.get_access_category_display }}{% if p.designation %} · {{ p.designation }}{% endif %}</label></div>
     {% endfor %}
   </fieldset>
-  <p><button type="submit">Sign in as selected persona</button></p>
+  <p><button type="submit">Sign in as selected profile</button></p>
 </form>
 {% else %}
-<p class="empty">No demonstration personas exist. Run <code>uv run python manage.py seed_demo</code>.</p>
+<p class="empty">No active profiles exist. Run <code>uv run python manage.py seed_demo</code> or provision a profile.</p>
 {% endif %}
 {% endblock %}

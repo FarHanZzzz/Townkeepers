@@ -76,8 +76,9 @@ def _problems(
     if not policies.within_hours(start, end, venue.opens_at, venue.closes_at):
         errors["start_time"] = ["The booking must fall inside this venue's opening hours."]
     for day in days:
-        if _restricted(venue, day, start, end):
-            errors["start_time"] = ["This time falls in a restricted or closed interval."]
+        reason = _restricted(venue, day, start, end)
+        if reason:
+            errors["start_time"] = [f"Booking blocked by restriction: {reason}"]
             break
         start_at, end_at = policies.occupied_bounds(
             day, start, end, booking_fields["setup_minutes"], booking_fields["cleanup_minutes"]
@@ -88,7 +89,7 @@ def _problems(
     return errors
 
 
-def _restricted(venue: Venue, day: date, start: time, end: time) -> bool:
+def _restricted(venue: Venue, day: date, start: time, end: time) -> str | None:
     rows = VenueRestriction.objects.filter(Q(venue=venue) | Q(venue__isnull=True))
     for row in rows:
         if row.weekday is not None and row.weekday != day.weekday():
@@ -100,11 +101,11 @@ def _restricted(venue: Venue, day: date, start: time, end: time) -> bool:
         # Overnight restrictions wrap past midnight.
         if row.local_start < row.local_end:
             if start < row.local_end and row.local_start < end:
-                return True
+                return row.reason or "This time is restricted."
         else:
             if start < row.local_end or row.local_start < end:
-                return True
-    return False
+                return row.reason or "This time is restricted."
+    return None
 
 
 def _blocked(venue: Venue, start_at, end_at) -> bool:
@@ -470,7 +471,7 @@ def add_restriction(
     """Record a restricted hour. A null venue applies to every venue (FR-EVT-03)."""
 
     def handler():
-        if actor.access_category not in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN}:
+        if actor.access_category != AccessCategory.DOSA_HEAD:
             raise PermissionDeniedError()
         venue = Venue.objects.filter(pk=venue_id).first() if venue_id else None
         if venue_id and venue is None:

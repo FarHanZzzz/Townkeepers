@@ -2,7 +2,7 @@
 {% block title %}{{ template.label }}{% endblock %}
 {% block content %}
 <h1>{{ template.label }}</h1>
-<div class="statusbar"><p>Status: <strong>{{ template.is_active|yesno:"Active,Inactive" }}</strong> · Current version {{ template.current_version.number }}</p></div>
+<div class="statusbar"><p>Status: <strong>{{ template.is_active|yesno:"Active,Inactive" }}</strong> · Current version {{ template.current_version.number }} · Visibility: <strong>{% if template.dosa_only %}DoSA only{% else %}All personas{% endif %}</strong></p></div>
 <div class="actions">
   {% if template.is_active %}
     <form method="post" action="{% url 'memos:template_active' template.pk 'deactivate' %}" data-confirm="Deactivate? Existing drafts keep their version; new drafts cannot select it.">{% csrf_token %}<button type="submit" class="secondary">Deactivate</button></form>
@@ -18,7 +18,25 @@
 </tbody></table>
 <h2>Save a new version</h2>
 <form method="post" novalidate class="panel">{% csrf_token %}
-  {% include "includes/form.html" %}
-  <button type="submit">Save new version</button>
+  {% if form.errors %}
+    <div class="error-summary" role="alert" tabindex="-1" data-error-summary>
+      <h2>There {{ form.errors|length|pluralize:"is a problem,are problems" }} with this form</h2>
+      <ul>{% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+      {% for field in form.visible_fields %}{% for error in field.errors %}<li><a href="#{{ field.auto_id }}">{{ field.label }}: {{ error }}</a></li>{% endfor %}{% endfor %}</ul>
+    </div>
+  {% endif %}
+  {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+  {% for field in form.visible_fields %}{% if field.name != "dosa_only" %}{% include "includes/field.html" %}{% endif %}{% endfor %}
+  <div class="field">
+    <label for="{{ form.dosa_only.id_for_label }}" class="button secondary" style="display:inline-flex;gap:.5rem;align-items:center;cursor:pointer;">
+      {{ form.dosa_only }} {{ form.dosa_only.label }}
+    </label>
+    {% if form.dosa_only.help_text %}<p class="help">{{ form.dosa_only.help_text }}</p>{% endif %}
+    {% for error in form.dosa_only.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+  </div>
+  <div class="actions">
+    <button type="submit">Save new version</button>
+    <a href="{% url 'memos:templates' %}" class="button secondary">Cancel</a>
+  </div>
 </form>
 {% endblock %}

@@ -16,7 +16,6 @@ from apps.accounts.commands import request_profile_change
 from apps.accounts.models import Grant, Profile, ProfileChangeRequest
 from apps.clubs.models import Assignment, Club, Term
 from apps.events.commands import EventInput, create_event
-from apps.events.models import Event
 from apps.finance.commands import BudgetLineInput, save_budget_version
 from apps.finance.models import Currency
 from apps.memos import commands as memo_commands
@@ -33,7 +32,7 @@ PEOPLE = [
         AccessCategory.DOSA_HEAD,
         "Head, Division of Student Activities",
     ),
-    ("advisor", "Synthetic Faculty Advisor", AccessCategory.FACULTY_ADVISOR, "Faculty Advisor"),
+    ("advisor", "Synthetic Faculty Advisor", AccessCategory.FACULTY_ADVISOR, "Faculty Advisor, IUB Debate Club"),
     (
         "president.bc",
         "Synthetic President (Business Club)",
@@ -158,18 +157,22 @@ class Command(BaseCommand):
                         "created_at": clock.now(),
                     },
                 )
-            for code, _name, _president in CLUBS:
-                Assignment.objects.get_or_create(
-                    profile=people["advisor"],
-                    club=clubs[code],
-                    kind=Assignment.Kind.FACULTY_ADVISOR,
-                    defaults={
-                        "start_date": clubs[code + ":term"].start_date,
-                        "designation": "Faculty Advisor",
-                        "granted_by": head,
-                        "created_at": clock.now(),
-                    },
-                )
+            advisor_code = "IUBDC"
+            Assignment.objects.get_or_create(
+                profile=people["advisor"],
+                club=clubs[advisor_code],
+                kind=Assignment.Kind.FACULTY_ADVISOR,
+                defaults={
+                    "start_date": clubs[advisor_code + ":term"].start_date,
+                    "designation": "Faculty Advisor, IUB Debate Club",
+                    "granted_by": head,
+                    "created_at": clock.now(),
+                },
+            )
+            # Keep the synthetic advisor affiliated with one club only.
+            Assignment.objects.filter(
+                profile=people["advisor"], kind=Assignment.Kind.FACULTY_ADVISOR
+            ).exclude(club=clubs[advisor_code]).update(ended_at=clock.now(), end_date=today)
             if not MemoTemplate.objects.exists():
                 template = MemoTemplate.objects.create(
                     label="Event permission memo",
@@ -448,7 +451,7 @@ def _seed_workspace(people, clubs) -> None:
         headcount=20,
         venue="Club room",
     )
-    debate_circle_memo = _draft_memo(
+    _draft_memo(
         president_dc,
         debate_circle,
         template.pk,

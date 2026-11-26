@@ -1,48 +1,129 @@
 {% extends "base.html" %}{% load ui %}
 {% block title %}Calendar{% endblock %}
 {% block content %}
-<h1>Calendar</h1>
-<p class="lede">Events and confirmed reservations from {{ start|date:"j M Y" }}. A room you cannot open is labelled Reserved.</p>
-<form method="get" class="panel">
-  <div class="field"><label for="start">From</label><input id="start" type="date" name="start" value="{{ start|date:'Y-m-d' }}"></div>
-  <div class="field"><label for="view">Range</label>
-    <select id="view" name="view">
-      <option value="week"{% if kind == "week" %} selected{% endif %}>Week</option>
-      <option value="month"{% if kind == "month" %} selected{% endif %}>Month</option>
-      <option value="list"{% if kind == "list" %} selected{% endif %}>List</option>
-    </select>
-  </div>
-  <div class="field"><label for="club">Club</label>
-    <select id="club" name="club">
-      <option value="">All clubs</option>
-      {% for c in clubs %}<option value="{{ c.pk }}"{% if club == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
-    </select>
-  </div>
-  <div class="field"><label for="venue">Venue</label>
-    <select id="venue" name="venue">
-      <option value="">All venues</option>
-      {% for v in venues %}<option value="{{ v.pk }}"{% if venue == v.pk|stringformat:"s" %} selected{% endif %}>{{ v.name }}</option>{% endfor %}
-    </select>
-  </div>
-  <div class="field"><label for="status">Status</label>
-    <select id="status" name="status">
-      <option value="">All statuses</option>
-      {% for value,label in statuses %}<option value="{{ value }}"{% if status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select>
-  </div>
-  <button type="submit">Show</button>
-</form>
-{% if rows %}
-<ul class="item-list">
-  {% for row in rows %}
-  <li>
-    <div class="item-main">
-      {% if row.event_id %}<a href="{% url 'events:detail' row.event_id %}">{{ row.label }}</a>{% else %}{{ row.label }}{% endif %}
-      <span class="item-meta">{{ row.status }} · {{ row.club }} · {{ row.venue }}</span>
+<header class="page-head">
+  <p class="kicker">Schedules</p>
+  <h1>Calendar</h1>
+  <p class="lede">Each day is coloured by how many events already sit on it: green for two or fewer, orange for exactly three, red for more. Select a day to see the club, venue and timing behind every booking.</p>
+</header>
+
+<section class="panel cal-page" aria-labelledby="cal-page-title">
+  <h2 id="cal-page-title" class="visually-hidden">Month view</h2>
+
+  <div class="cal-page-toolbar">
+    <div class="cal-nav">
+      <a class="icon-button" href="{{ prev_url }}" aria-label="Previous month">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <span class="cal-modal-month">{{ month_label }}</span>
+      <a class="icon-button" href="{{ next_url }}" aria-label="Next month">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </a>
+      <a class="icon-button" href="{{ today_url }}">Today</a>
     </div>
-    <div class="item-side"><time>{{ row.when|date:"j M Y, H:i" }}</time></div>
-  </li>
-  {% endfor %}
-</ul>
-{% else %}<p class="empty">No events match these filters.</p>{% endif %}
+
+    <form method="get" class="cal-filters" role="search">
+      <input type="hidden" name="start" value="{{ start_value }}">
+      <label class="cal-filter">
+        <span>Club</span>
+        <select name="club">
+          <option value="">All clubs</option>
+          {% for c in clubs %}<option value="{{ c.pk }}"{% if filters.club == c.pk|stringformat:"s" %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="cal-filter">
+        <span>Venue</span>
+        <select name="venue">
+          <option value="">All venues</option>
+          {% for v in venues %}<option value="{{ v.pk }}"{% if filters.venue == v.pk|stringformat:"s" %} selected{% endif %}>{{ v.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="cal-filter">
+        <span>Status</span>
+        <select name="status">
+          <option value="">All statuses</option>
+          {% for value,label in statuses %}<option value="{{ value }}"{% if filters.status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <button type="submit" class="button-sm">Show</button>
+    </form>
+  </div>
+
+  <div class="cal-legend" aria-hidden="true">
+    <span class="cal-legend-item"><i class="cal-dot cal-dot-green"></i> Free · 0–2 events</span>
+    <span class="cal-legend-item"><i class="cal-dot cal-dot-orange"></i> Busy · 3 events</span>
+    <span class="cal-legend-item"><i class="cal-dot cal-dot-red"></i> Packed · 4+ events</span>
+  </div>
+
+  <div class="cal-dow" aria-hidden="true">
+    {% for name in weekdays %}<span class="cal-dow-name">{{ name }}</span>{% endfor %}
+  </div>
+  <div class="cal-grid cal-grid-page">
+    {% for cell in cells %}
+      {% if cell %}
+        <a class="cal-cell cal-day-{{ cell.level }}{% if cell.count %} cal-cell-has-events{% endif %}{% if cell.key == selected_key %} cal-cell-selected{% endif %}{% if cell.is_today %} cal-cell-today{% endif %}"
+           href="{{ cell.url }}"
+           {% if cell.key == selected_key %}aria-current="date"{% endif %}
+           aria-label="{{ cell.day }}: {{ cell.count }} event{{ cell.count|pluralize }}">
+          <span class="cal-date">{{ cell.day }}</span>
+          {% if cell.count %}<span class="cal-count">{{ cell.count }}</span>{% endif %}
+        </a>
+      {% else %}
+        <span class="cal-cell cal-cell-blank" aria-hidden="true"></span>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+{% if selected_key %}
+<section class="panel" aria-labelledby="day-title">
+  <header class="card-head">
+    <h2 id="day-title">{{ selected_label }}</h2>
+    <span class="badge badge-neutral">{{ selected_events|length }} event{{ selected_events|length|pluralize }}</span>
+  </header>
+  {% if selected_events %}
+    {% for ev in selected_events %}
+      <div class="cal-event-row">
+        <div class="cal-event-time">{{ ev.start_time|default:"—" }}{% if ev.end_time %}<br>{{ ev.end_time }}{% endif %}</div>
+        <div class="cal-event-info">
+          <a class="cal-event-title" href="{{ ev.url }}">{{ ev.title }}</a>
+          <div class="cal-event-meta">
+            <span>{{ ev.club }}</span>
+            <span>{{ ev.venue }}</span>
+            <span>{{ ev.status }}</span>
+            {% if ev.is_big %}<span class="badge badge-warn">Big event</span>{% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty">Nothing is booked on this day. A room can still be requested from the event page.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="panel" aria-labelledby="upcoming-title">
+  <header class="card-head">
+    <h2 id="upcoming-title">Coming up</h2>
+    <span class="help">Next eight events you can see</span>
+  </header>
+  {% if upcoming %}
+    <ul class="item-list">
+      {% for ev in upcoming %}
+      <li>
+        <div class="item-main">
+          <a href="{{ ev.url }}">{{ ev.title }}</a>
+          <span class="item-meta">{{ ev.club }} · {{ ev.venue }}</span>
+        </div>
+        <div class="item-side">
+          <time>{{ ev.first_date }}{% if ev.last_date != ev.first_date %} – {{ ev.last_date }}{% endif %}</time>
+          <span class="item-meta">{{ ev.start_time|default:"—" }}–{{ ev.end_time|default:"—" }}</span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="empty">No upcoming events match these filters.</p>
+  {% endif %}
+</section>
 {% endblock %}
