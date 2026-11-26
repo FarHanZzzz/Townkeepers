@@ -35,16 +35,10 @@ PEOPLE = [
     ),
     ("advisor", "Synthetic Faculty Advisor", AccessCategory.FACULTY_ADVISOR, "Faculty Advisor"),
     (
-        "president.pc",
-        "Synthetic President (Programming Club)",
+        "president.bc",
+        "Synthetic President (Business Club)",
         AccessCategory.EB_MEMBER,
-        "President, IUB Programming Club",
-    ),
-    (
-        "president.sc",
-        "Synthetic President (Science Club)",
-        AccessCategory.EB_MEMBER,
-        "President, IUB Science Club",
+        "President, IUB Business Club",
     ),
     (
         "president.dc",
@@ -52,26 +46,11 @@ PEOPLE = [
         AccessCategory.EB_MEMBER,
         "President, IUB Debate Club",
     ),
-    (
-        "president.bc",
-        "Synthetic President (Business Club)",
-        AccessCategory.EB_MEMBER,
-        "President, IUB Business Club",
-    ),
-    (
-        "president.cc",
-        "Synthetic President (Cultural Club)",
-        AccessCategory.EB_MEMBER,
-        "President, IUB Cultural Club",
-    ),
 ]
 
 CLUBS = (
-    ("IUBPC", "IUB Programming Club", "president.pc"),
-    ("IUBSC", "IUB Science Club", "president.sc"),
-    ("IUBDC", "IUB Debate Club", "president.dc"),
     ("IUBBC", "IUB Business Club", "president.bc"),
-    ("IUBCC", "IUB Cultural Club", "president.cc"),
+    ("IUBDC", "IUB Debate Club", "president.dc"),
 )
 
 
@@ -319,111 +298,92 @@ def _seed_workspace(people, clubs) -> None:
     Idempotent: a second run leaves the workspace alone once the marker event exists.
     Every write goes through the same commands a person would use.
     """
-    if Event.objects.filter(title="Winter programming workshop").exists():
+    # Use only the president and club that exist; skip if fewer than 2 each.
+    president_handles = [h for h in ("president.bc", "president.dc") if h in people]
+    club_codes = [c for c in ("IUBBC", "IUBDC") if c in clubs]
+    if len(president_handles) < 2 or len(club_codes) < 2:
         return
+    president_bc = people["president.bc"]
+    president_dc = people["president.dc"]
+    business = clubs["IUBBC"]
+    debate = clubs["IUBDC"]
+    today = clock.local_today()
+
     template = MemoTemplate.objects.filter(is_active=True).first()
     if template is None:
         return
     head = people["head"]
     advisor_pc = people["advisor"]
-    president_pc = people["president.pc"]
-    president_sc = people["president.sc"]
-    programming = clubs["IUBPC"]
-    science = clubs["IUBSC"]
-    today = clock.local_today()
 
+    # --- Business Club events ---
     workshop = _open_event(
-        president_pc,
-        programming,
-        title="Winter programming workshop",
+        president_bc,
+        business,
+        title="Winter workshop",
         event_type="workshop",
         when=today + timedelta(days=21),
         headcount=40,
         venue="Department classroom",
     )
     memo = _draft_memo(
-        president_pc,
+        president_bc,
         workshop,
         template.pk,
         **_memo_fields(
-            president_pc,
-            programming.name,
-            "Winter programming workshop",
+            president_bc,
+            business.name,
+            "Winter workshop",
             "The club requests permission for an evening workshop for 40 participants.",
         ),
     )
-    _decide(advisor_pc, _send(president_pc, memo), "confirm")
-
-    colloquium = _open_event(
-        president_sc,
-        science,
-        title="Science colloquium",
-        event_type="seminar",
-        when=today + timedelta(days=35),
-        headcount=60,
-        venue="Seminar room",
-    )
-    _send(
-        president_sc,
-        _draft_memo(
-            president_sc,
-            colloquium,
-            template.pk,
-            **_memo_fields(
-                president_sc,
-                science.name,
-                "Science colloquium",
-                "The club requests permission for an evening colloquium for 60 participants.",
-            ),
-        ),
-    )
+    _decide(advisor_pc, _send(president_bc, memo), "confirm")
 
     circle = _open_event(
-        president_pc,
-        programming,
-        title="Evening coding circle",
+        president_bc,
+        business,
+        title="Coding circle",
         event_type="workshop",
         when=today + timedelta(days=18),
         headcount=25,
         venue="Club room",
     )
     _draft_memo(
-        president_pc,
+        president_bc,
         circle,
         template.pk,
         **_memo_fields(
-            president_pc,
-            programming.name,
-            "Evening coding circle",
+            president_bc,
+            business.name,
+            "Coding circle",
             "Draft only. The club has not sent this memo to the Faculty Advisor.",
         ),
     )
 
     orientation = _open_event(
-        president_pc,
-        programming,
-        title="Club orientation briefing",
+        president_bc,
+        business,
+        title="Orientation briefing",
         event_type="other",
         when=today + timedelta(days=14),
         headcount=30,
         venue="Department classroom",
     )
     approved = _draft_memo(
-        president_pc,
+        president_bc,
         orientation,
         template.pk,
         **_memo_fields(
-            president_pc,
-            programming.name,
-            "Club orientation briefing",
+            president_bc,
+            business.name,
+            "Orientation briefing",
             "The club requests permission for a short orientation briefing.",
         ),
     )
-    _decide(head, _decide(advisor_pc, _send(president_pc, approved), "confirm"), "approve")
+    _decide(head, _decide(advisor_pc, _send(president_bc, approved), "confirm"), "approve")
 
     supplies = _open_event(
-        president_pc,
-        programming,
+        president_bc,
+        business,
         title="Workshop supplies request",
         event_type="workshop",
         when=today + timedelta(days=24),
@@ -431,7 +391,7 @@ def _seed_workspace(people, clubs) -> None:
         venue="Department classroom",
     )
     save_budget_version(
-        president_pc,
+        president_bc,
         supplies,
         lines=[
             BudgetLineInput(
@@ -447,14 +407,58 @@ def _seed_workspace(people, clubs) -> None:
     )
 
     if not ProfileChangeRequest.objects.filter(
-        profile=president_pc, status=ProfileChangeRequest.Status.PENDING
+        profile=president_bc, status=ProfileChangeRequest.Status.PENDING
     ).exists():
         request_profile_change(
-            president_pc,
+            president_bc,
             field="department",
             proposed_value="cse",
             operation_key=_op(),
         )
+
+    # --- Debate Club events ---
+    debate_workshop = _open_event(
+        president_dc,
+        debate,
+        title="Debate workshop",
+        event_type="workshop",
+        when=today + timedelta(days=28),
+        headcount=35,
+        venue="Seminar room",
+    )
+    debate_memo = _draft_memo(
+        president_dc,
+        debate_workshop,
+        template.pk,
+        **_memo_fields(
+            president_dc,
+            debate.name,
+            "Debate workshop",
+            "The club requests permission for an evening workshop for 35 participants.",
+        ),
+    )
+    _decide(advisor_pc, _send(president_dc, debate_memo), "confirm")
+
+    debate_circle = _open_event(
+        president_dc,
+        debate,
+        title="Debate circle",
+        event_type="workshop",
+        when=today + timedelta(days=22),
+        headcount=20,
+        venue="Club room",
+    )
+    debate_circle_memo = _draft_memo(
+        president_dc,
+        debate_circle,
+        template.pk,
+        **_memo_fields(
+            president_dc,
+            debate.name,
+            "Debate circle",
+            "Draft only. The club has not sent this memo to the Faculty Advisor.",
+        ),
+    )
 
     now = clock.now()
     Job.objects.get_or_create(
