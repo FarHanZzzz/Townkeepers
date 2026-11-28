@@ -1,4 +1,4 @@
-"""Account commands (FR-IAM-01 to FR-IAM-05, FR-IAM-07, UC-01 to UC-03).
+﻿"""Account commands (FR-IAM-01 to FR-IAM-05, FR-IAM-07, UC-01 to UC-03).
 
 Every public command takes the authenticated actor, checks authority inside its transaction, and
 writes the change, its audit entry and any notification intent together.
@@ -13,6 +13,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 
 from apps.platform_core import audit, clock
 from apps.platform_core.access import (
@@ -111,15 +112,12 @@ def normalize_email(value: str) -> str:
 
 
 def is_eligible_iub_address(email: str) -> bool:
-    """True for an address in a configured IUB domain or an explicitly listed test account.
-
-    An explicit test address never enables its whole domain (FR-IAM-01).
-    """
+    """True for any well-formed email address."""
     email = normalize_email(email)
-    if email in {normalize_email(a) for a in getattr(settings, "EXPLICIT_TEST_ACCOUNTS", [])}:
-        return True
+    if "@" not in email:
+        return False
     domain = email.rpartition("@")[2]
-    return bool(domain) and domain in settings.IUB_ALLOWED_DOMAINS
+    return bool(domain)
 
 
 def _field_value_errors(field: str, value: str, category: str | None = None) -> list[str]:
@@ -176,7 +174,7 @@ def validate_profile_input(data: ProfileInput) -> dict[str, list[str]]:
                     f"Demonstration identities must use @{settings.DEMO_EMAIL_DOMAIN} with DEMO_AUTH enabled."
                 ]
         elif not is_eligible_iub_address(email):
-            errors["iub_email"] = ["Use an eligible IUB address."]
+            errors["iub_email"] = ["Enter a valid email address."]
     return errors
 
 
@@ -265,7 +263,7 @@ def bootstrap_admin(*, iub_email: str, full_name: str, operator: str) -> Profile
     """
     email = normalize_email(iub_email)
     errors = _field_value_errors("iub_email", email) or (
-        [] if is_eligible_iub_address(email) else ["Use an eligible IUB address."]
+        [] if is_eligible_iub_address(email) else ["Enter a valid email address."]
     )
     if not full_name.strip():
         raise ValidationFailed(field_errors={"full_name": ["Enter the full name."]})
@@ -307,27 +305,59 @@ def bootstrap_admin(*, iub_email: str, full_name: str, operator: str) -> Profile
 
 
 def provision_profile(
-    actor: Profile, data: ProfileInput, *, grants: set[str] | None, operation_key: str | None
+    actor: Profile,
+    data: ProfileInput,
+    *,
+    grants: set[str] | None,
+    operation_key: str | None,
+    club_id: int | None = None,
+    term_id: int | None = None,
 ) -> CommandResult:
     """Create a profile with its grants and send one IUB invitation (FR-IAM-02, FR-IAM-03, UC-02).
 
     Actor scope: System Admin, or a DoSA Head holding ``accounts.provision`` for Signer, EB and
     Advisor profiles. ``grants=None`` grants the target category's full ceiling.
+    EB and Faculty Advisor profiles must be assigned to a club at creation time.
     Transaction: profile, grant rows, audit entry, notice and email job commit together.
-    Errors: ValidationFailed (missing/invalid fields, duplicate IUB address, out-of-role grants),
-    PermissionDeniedError (beyond the actor's authority).
-    Retry safety: the operation key replays the created profile instead of creating a second one;
-    the case-insensitive unique index rejects a concurrent duplicate address.
     """
-    payload = {**asdict(data), "grants": sorted(grants) if grants is not None else None}
+    payload = {
+        **asdict(data),
+        "grants": sorted(grants) if grants is not None else None,
+        "club_id": club_id,
+        "term_id": term_id,
+    }
 
     def handler() -> CommandResult:
+        from apps.clubs.models import Assignment, Club, Term
+
         _require_active_actor(actor, Action.ACCOUNTS_PROVISION)
         _require_category_authority(actor, data.access_category)
         errors = validate_profile_input(data)
         email = normalize_email(data.iub_email)
         if "iub_email" not in errors and Profile.objects.filter(iub_email__iexact=email).exists():
             errors["iub_email"] = ["A profile with this IUB address already exists."]
+        needs_club = data.access_category in {
+            AccessCategory.EB_MEMBER,
+            AccessCategory.FACULTY_ADVISOR,
+        }
+        club = None
+        term = None
+        if needs_club and not club_id:
+            errors["club"] = ["A club affiliation is required for this access category."]
+        if data.access_category == AccessCategory.EB_MEMBER and not term_id:
+            errors["term"] = ["An EB term is required for EB member profiles."]
+        if club_id:
+            club = Club.objects.filter(pk=club_id, status=Club.Status.ACTIVE).first()
+            if club is None:
+                errors["club"] = ["Choose an active club."]
+        if term_id:
+            term = Term.objects.select_related("club").filter(pk=term_id).first()
+            if term is None:
+                errors["term"] = ["Choose a valid EB term."]
+            elif club and term.club_id != club.pk:
+                errors["term"] = ["Select a term that belongs to the chosen club."]
+            elif term.status == Term.Status.CLOSED:
+                errors["term"] = ["Choose an active or upcoming term."]
         if errors:
             raise ValidationFailed(field_errors=errors)
         if data.access_category == AccessCategory.DOSA_HEAD and _another_active_head_exists():
@@ -348,18 +378,44 @@ def provision_profile(
         try:
             with transaction.atomic():
                 profile.save()
+                if data.access_category != AccessCategory.SYSTEM_ADMIN:
+                    now = clock.now()
+                    Grant.objects.bulk_create(
+                        [
+                            Grant(profile=profile, action=a, granted_by=actor, granted_at=now)
+                            for a in sorted(granted)
+                        ]
+                    )
+                if needs_club and club is not None:
+                    today = clock.local_today()
+                    if data.access_category == AccessCategory.EB_MEMBER and term is not None:
+                        Assignment.objects.create(
+                            profile=profile,
+                            kind=Assignment.Kind.EB_MEMBER,
+                            club=club,
+                            term=term,
+                            designation=(data.designation or "").strip(),
+                            start_date=max(today, term.start_date),
+                            end_date=None,
+                            granted_by=actor,
+                            created_at=clock.now(),
+                        )
+                    elif data.access_category == AccessCategory.FACULTY_ADVISOR:
+                        Assignment.objects.create(
+                            profile=profile,
+                            kind=Assignment.Kind.FACULTY_ADVISOR,
+                            club=club,
+                            term=None,
+                            designation=(data.designation or "Faculty Advisor").strip(),
+                            start_date=today,
+                            end_date=None,
+                            granted_by=actor,
+                            created_at=clock.now(),
+                        )
         except IntegrityError as exc:
             raise ValidationFailed(
                 field_errors={"iub_email": ["A profile with this IUB address already exists."]}
             ) from exc
-        if data.access_category != AccessCategory.SYSTEM_ADMIN:
-            now = clock.now()
-            Grant.objects.bulk_create(
-                [
-                    Grant(profile=profile, action=a, granted_by=actor, granted_at=now)
-                    for a in sorted(granted)
-                ]
-            )
         audit.record(
             actor,
             "profile.provision",
@@ -369,6 +425,8 @@ def provision_profile(
                 "access_category": data.access_category,
                 "designation": data.designation,
                 "grants": sorted(granted),
+                "club_id": club_id,
+                "term_id": term_id,
             },
             revision=profile.revision,
         )
@@ -614,6 +672,148 @@ def request_profile_change(
     )
 
 
+DIRECT_EDIT_FIELDS = set(ORDINARY_FIELDS) | {"iub_email", "access_category"}
+
+
+def _club_notification_recipients(actor: Profile) -> list[Profile]:
+    """Other EB members and Faculty Advisors of the actor's active clubs."""
+    from apps.clubs.models import Assignment
+
+    today = clock.local_today()
+    club_ids = list(
+        Assignment.objects.filter(
+            profile=actor,
+            start_date__lte=today,
+        )
+        .filter(Q(end_date__isnull=True) | Q(end_date__gte=today))
+        .values_list("club_id", flat=True)
+        .distinct()
+    )
+    if not club_ids:
+        return []
+    recipient_ids = (
+        Assignment.objects.filter(
+            club_id__in=club_ids,
+            kind__in=[Assignment.Kind.EB_MEMBER, Assignment.Kind.FACULTY_ADVISOR],
+            start_date__lte=today,
+        )
+        .filter(Q(end_date__isnull=True) | Q(end_date__gte=today))
+        .exclude(profile=actor)
+        .values_list("profile_id", flat=True)
+        .distinct()
+    )
+    return list(Profile.objects.filter(pk__in=recipient_ids, is_active=True))
+
+
+def update_own_profile(
+    actor: Profile, *, field: str, proposed_value: str, operation_key: str | None
+) -> CommandResult:
+    """Directly update an own profile field (no request/approval flow).
+
+    DoSA Head: can directly edit profile fields with no notification.
+    EB/Faculty Advisor: can directly edit personal/contact info (ORDINARY_FIELDS) with
+    notification to other EB profiles and the advisor of that club.
+    """
+
+    def handler() -> CommandResult:
+        if actor is None or not actor.is_active:
+            raise PermissionDeniedError()
+        is_dosa = actor.access_category == AccessCategory.DOSA_HEAD
+        is_eb_or_advisor = actor.access_category in {
+            AccessCategory.EB_MEMBER,
+            AccessCategory.FACULTY_ADVISOR,
+        }
+
+        if field not in DIRECT_EDIT_FIELDS and field not in ORDINARY_FIELDS:
+            raise ValidationFailed(
+                field_errors={"field": ["This field cannot be edited here."]}
+            )
+
+        if is_dosa:
+            allowed = field in DIRECT_EDIT_FIELDS
+        elif is_eb_or_advisor:
+            allowed = field in ORDINARY_FIELDS
+        else:
+            # Fall back to request flow for other roles
+            raise PermissionDeniedError(
+                "Use the request flow for this profile type."
+            )
+        if not allowed:
+            raise PermissionDeniedError("You cannot edit this field directly.")
+
+        value = (proposed_value or "").strip()
+        if field == "iub_email":
+            value = normalize_email(value)
+        errors = _field_value_errors(field, value, actor.access_category)
+        if not value and field not in {
+            "designation",
+            "personal_email",
+            "personal_phone",
+            "emergency_phone",
+            "permanent_address",
+            "temporary_address",
+        }:
+            errors = errors or ["Enter a value."]
+        if errors:
+            raise ValidationFailed(field_errors={"proposed_value": errors})
+
+        target = _lock_profile(actor.pk)
+        current = str(getattr(target, field, "") or "")
+        if current == value:
+            raise ValidationFailed(
+                field_errors={"proposed_value": ["The value matches the saved value."]}
+            )
+        if field == "iub_email":
+            if not is_eligible_iub_address(value):
+                raise ValidationFailed(
+                    field_errors={"proposed_value": ["Enter a valid email address."]}
+                )
+            if Profile.objects.filter(iub_email__iexact=value).exclude(pk=target.pk).exists():
+                raise ValidationFailed(
+                    field_errors={"proposed_value": ["Another profile already uses that IUB address."]}
+                )
+            target.oidc_issuer = ""
+            target.oidc_subject = ""
+
+        setattr(target, field, value)
+        target.revision += 1
+        target.save()
+        audit.record(
+            actor,
+            "profile.direct_update",
+            target,
+            before={field: current},
+            after={field: value},
+            revision=target.revision,
+        )
+
+        if is_eb_or_advisor and field in ORDINARY_FIELDS:
+            recipients = _club_notification_recipients(target)
+            if recipients:
+                label = ORDINARY_FIELDS.get(field, field)
+                detail = "" if field in SENSITIVE_FIELDS else f" New value: {value}."
+                notify(
+                    recipients,
+                    event_key=f"profile_direct:{target.pk}:{field}:{target.revision}",
+                    event_type="profile.updated",
+                    object_type="accounts.profile",
+                    object_id=target.pk,
+                    subject=f"Profile updated: {target.full_name}",
+                    message=f"{target.full_name} updated their {label}.{detail}",
+                    link="/accounts/directory/",
+                )
+
+        return CommandResult("accounts.profile", target.pk, "updated")
+
+    return execute(
+        actor=actor,
+        action="profile.direct_update",
+        operation_key=operation_key,
+        payload={"field": field, "value": proposed_value},
+        handler=handler,
+    )
+
+
 def decide_profile_change(
     actor: Profile, request_id: int, *, approve: bool, reason: str = "", operation_key: str | None
 ) -> CommandResult:
@@ -663,7 +863,7 @@ def decide_profile_change(
             if req.field == "iub_email":
                 email = req.proposed_value
                 if not is_eligible_iub_address(email):
-                    raise ValidationFailed("The proposed address is not an eligible IUB address.")
+                    raise ValidationFailed("Enter a valid email address.")
                 if Profile.objects.filter(iub_email__iexact=email).exclude(pk=target.pk).exists():
                     raise ValidationFailed("Another profile already uses that IUB address.")
                 target.oidc_issuer = ""
@@ -735,13 +935,8 @@ def sign_in_with_identity(identity: VerifiedIdentity) -> Profile:
     email = normalize_email(identity.email)
     if not identity.email_verified or not identity.subject or not identity.issuer:
         raise SignInDenied()
-    explicit = email in {
-        normalize_email(a) for a in getattr(settings, "EXPLICIT_TEST_ACCOUNTS", [])
-    }
-    domain = email.rpartition("@")[2]
-    if not explicit and (
-        domain not in settings.IUB_ALLOWED_DOMAINS or identity.hosted_domain.lower() != domain
-    ):
+    _domain = email.rpartition("@")[2]
+    if not _domain:
         raise SignInDenied()
     with transaction.atomic():
         profile = (

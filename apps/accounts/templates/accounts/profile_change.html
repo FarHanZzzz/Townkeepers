@@ -1,10 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Request a change{% endblock %}
+{% block title %}{% if direct %}Edit {{ label }}{% else %}Request a change{% endif %}{% endblock %}
 {% block content %}
-<h1>Request a change: {{ label }}</h1>
+<h1>{% if direct %}Edit: {{ label }}{% else %}Request a change: {{ label }}{% endif %}</h1>
+{% if direct %}
+<p>Saved value: <strong>{{ current|default:"Not recorded" }}</strong>. Your change will be saved directly.</p>
+{% else %}
 <p>Saved value: <strong>{{ current|default:"Not recorded" }}</strong>. It stays in effect while your request is reviewed by {{ route }}.</p>
+{% endif %}
 <form method="post" novalidate class="panel">{% csrf_token %}
   {% include "includes/form.html" %}
-  <div class="actions"><button type="submit">Submit request</button><a href="{% url 'accounts:profile' %}">Cancel</a></div>
+  <div class="actions"><button type="submit">{% if direct %}Save{% else %}Submit request{% endif %}</button><a href="{% url 'accounts:profile' %}">Cancel</a></div>
 </form>
 {% endblock %}

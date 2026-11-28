@@ -113,11 +113,16 @@ class DecisionForm(forms.Form):
 
 
 class TemplateForm(CommandForm):
-    label = forms.CharField(max_length=120, label="DoSA template label")
-    instructions = forms.CharField(widget=forms.Textarea(attrs={"rows": 3}), required=False)
+    label = forms.CharField(max_length=120, label="Template name")
+    instructions = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 3}),
+        required=False,
+        label="Details / instructions",
+    )
     required_fields = forms.MultipleChoiceField(
         choices=[(k, v) for k, v in MEMO_FIELDS.items()],
         required=False,
+        initial=["to_line", "through_line", "from_line", "memo_date", "subject", "body"],
         widget=forms.CheckboxSelectMultiple,
         help_text="To, Through, From, memo date, subject and body are always required.",
     )
@@ -127,13 +132,18 @@ class TemplateForm(CommandForm):
         help_text="One per line as key|label|required (yes/no), for example: agenda|Event agenda|yes",
     )
     advisor_signature = forms.BooleanField(
-        required=False, initial=True, label="Faculty Advisor signature area"
+        required=False, initial=True, label="Club advisor signature spot"
     )
     dosa_signature = forms.BooleanField(
-        required=False, initial=True, label="DoSA Head signature area"
+        required=False, initial=True, label="DoSA Head signature spot"
     )
     requires_budget = forms.BooleanField(
         required=False, label="A budget version must be linked before sending"
+    )
+    dosa_only = forms.BooleanField(
+        required=False,
+        label="DoSA only use",
+        help_text="If selected, only DoSA profiles can see and use this template.",
     )
 
     def attachments(self) -> tuple[dict, ...]:

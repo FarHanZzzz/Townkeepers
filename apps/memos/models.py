@@ -21,6 +21,10 @@ class MemoTemplate(models.Model):
 
     label = models.CharField(max_length=120, unique=True)
     is_active = models.BooleanField(default=False)
+    dosa_only = models.BooleanField(
+        default=False,
+        help_text="When true, only DoSA personas can see and use this template.",
+    )
     current_version = models.ForeignKey(
         "TemplateVersion", null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )

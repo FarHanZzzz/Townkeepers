@@ -2,7 +2,11 @@
 {% block title %}Memo Management{% endblock %}
 {% block content %}
 <h1>Memo Management</h1>
-{% if can_author %}<p><a class="button" href="{% url 'memos:new' %}">Start a memo</a></p>{% endif %}
+<p>
+  {% if can_author %}<a class="button" href="{% url 'memos:new' %}">Start a memo</a> {% endif %}
+  {% if can_manage_templates %}<a class="button secondary" href="{% url 'memos:template_new' %}">Make memo template</a> {% endif %}
+  <button type="button" class="button secondary" data-calendar-open="view" data-calendar-title="Event calendar">Calendar view</button>
+</p>
 
 {% if queue is not None %}
 <section class="panel" aria-labelledby="queue-h">

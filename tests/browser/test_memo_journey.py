@@ -1,4 +1,4 @@
-"""Browser journey: EB author, Faculty Advisor and DoSA Head through rejection and resubmission.
+﻿"""Browser journey: EB author, Faculty Advisor and DoSA Head through rejection and resubmission.
 
 Requires ``uv run playwright install chromium``. Runs against Django's live server with the
 development-only demo sign-in (synthetic identities only).
@@ -24,7 +24,7 @@ pytestmark = [pytest.mark.browser, pytest.mark.django_db(transaction=True)]
 def sign_in(page, base, name):
     page.goto(f"{base}/dev/login/")
     page.get_by_label(name, exact=False).check()
-    page.get_by_role("button", name="Sign in as selected persona").click()
+    page.get_by_role("button", name="Sign in as selected profile").click()
     page.wait_for_url(f"{base}/")
 
 

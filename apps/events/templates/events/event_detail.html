@@ -49,13 +49,23 @@
   <form method="post" action="{% url 'events:book' event.pk %}">
     {% csrf_token %}
     <input type="hidden" name="operation_key" value="book-{{ event.pk }}-{{ event.revision }}">
-    <div class="field"><label for="venue">Venue</label>
-      <select id="venue" name="venue">{% for v in venues %}<option value="{{ v.pk }}">{{ v.name }} ({{ v.capacity }})</option>{% endfor %}</select>
+    <div class="slot-picker" data-slot-picker>
+      <div class="slot-summary">
+        <div><span>Dates</span><strong data-slot-date>Not chosen</strong></div>
+        <div><span>Time</span><strong data-slot-time>—</strong></div>
+        <div><span>Venue</span><strong data-slot-venue>Not chosen</strong></div>
+      </div>
+      <button type="button" class="button" data-slot-open data-calendar-title="Choose a date, time and venue">Choose date, time &amp; venue</button>
+      <div class="slot-fields">
+        <div class="field"><label for="venue">Venue</label>
+          <select id="venue" name="venue"><option value="">Choose a venue</option>{% for v in venues %}<option value="{{ v.pk }}">{{ v.name }} ({{ v.capacity }})</option>{% endfor %}</select>
+        </div>
+        <div class="field"><label for="first_date">First date</label><input id="first_date" type="date" name="first_date" value="{{ event.first_date|date:'Y-m-d' }}"></div>
+        <div class="field"><label for="last_date">Last date</label><input id="last_date" type="date" name="last_date" value="{{ event.last_date|date:'Y-m-d' }}"></div>
+        <div class="field"><label for="start_time">Start</label><input id="start_time" type="time" name="start_time" value="{{ event.start_time|time:'H:i' }}"></div>
+        <div class="field"><label for="end_time">End</label><input id="end_time" type="time" name="end_time" value="{{ event.end_time|time:'H:i' }}"></div>
+      </div>
     </div>
-    <div class="field"><label for="first_date">First date</label><input id="first_date" type="date" name="first_date" value="{{ event.first_date|date:'Y-m-d' }}"></div>
-    <div class="field"><label for="last_date">Last date</label><input id="last_date" type="date" name="last_date" value="{{ event.last_date|date:'Y-m-d' }}"></div>
-    <div class="field"><label for="start_time">Start</label><input id="start_time" type="time" name="start_time" value="{{ event.start_time|time:'H:i' }}"></div>
-    <div class="field"><label for="end_time">End</label><input id="end_time" type="time" name="end_time" value="{{ event.end_time|time:'H:i' }}"></div>
     <div class="field"><label for="headcount">Expected students</label><input id="headcount" name="headcount" value="{{ event.expected_headcount|default:'' }}"></div>
     <div class="field"><label for="filer_designation">Your designation</label><input id="filer_designation" name="filer_designation" value="{{ user.designation }}"></div>
     <button type="submit">Submit booking request</button>
@@ -78,13 +88,23 @@
     <p class="help">If the new time is taken, this reservation stays where it is.</p>
     <input type="hidden" name="revision" value="{{ b.revision }}">
     <input type="hidden" name="operation_key" value="move-{{ b.pk }}-{{ b.revision }}">
-    <div class="field"><label for="move-venue-{{ b.pk }}">Venue</label>
-      <select id="move-venue-{{ b.pk }}" name="venue">{% for v in venues %}<option value="{{ v.pk }}"{% if v.pk == b.venue_id %} selected{% endif %}>{{ v.name }}</option>{% endfor %}</select>
+    <div class="slot-picker" data-slot-picker>
+      <div class="slot-summary">
+        <div><span>Dates</span><strong data-slot-date>Not chosen</strong></div>
+        <div><span>Time</span><strong data-slot-time>—</strong></div>
+        <div><span>Venue</span><strong data-slot-venue>Not chosen</strong></div>
+      </div>
+      <button type="button" class="button secondary" data-slot-open data-calendar-title="Move this booking">Choose date, time &amp; venue</button>
+      <div class="slot-fields">
+        <div class="field"><label for="move-venue-{{ b.pk }}">Venue</label>
+          <select id="move-venue-{{ b.pk }}" name="venue">{% for v in venues %}<option value="{{ v.pk }}"{% if v.pk == b.venue_id %} selected{% endif %}>{{ v.name }}</option>{% endfor %}</select>
+        </div>
+        <div class="field"><label for="move-first-{{ b.pk }}">First date</label><input id="move-first-{{ b.pk }}" type="date" name="first_date" value="{{ b.first_date|date:'Y-m-d' }}"></div>
+        <div class="field"><label for="move-last-{{ b.pk }}">Last date</label><input id="move-last-{{ b.pk }}" type="date" name="last_date" value="{{ b.last_date|date:'Y-m-d' }}"></div>
+        <div class="field"><label for="move-start-{{ b.pk }}">Start</label><input id="move-start-{{ b.pk }}" type="time" name="start_time" value="{{ b.start_time|time:'H:i' }}"></div>
+        <div class="field"><label for="move-end-{{ b.pk }}">End</label><input id="move-end-{{ b.pk }}" type="time" name="end_time" value="{{ b.end_time|time:'H:i' }}"></div>
+      </div>
     </div>
-    <div class="field"><label for="move-first-{{ b.pk }}">First date</label><input id="move-first-{{ b.pk }}" type="date" name="first_date" value="{{ b.first_date|date:'Y-m-d' }}"></div>
-    <div class="field"><label for="move-last-{{ b.pk }}">Last date</label><input id="move-last-{{ b.pk }}" type="date" name="last_date" value="{{ b.last_date|date:'Y-m-d' }}"></div>
-    <div class="field"><label for="move-start-{{ b.pk }}">Start</label><input id="move-start-{{ b.pk }}" type="time" name="start_time" value="{{ b.start_time|time:'H:i' }}"></div>
-    <div class="field"><label for="move-end-{{ b.pk }}">End</label><input id="move-end-{{ b.pk }}" type="time" name="end_time" value="{{ b.end_time|time:'H:i' }}"></div>
     <div class="field"><label for="move-setup-{{ b.pk }}">Setup minutes</label><input id="move-setup-{{ b.pk }}" name="setup_minutes" value="{{ b.setup_minutes }}"></div>
     <div class="field"><label for="move-cleanup-{{ b.pk }}">Cleanup minutes</label><input id="move-cleanup-{{ b.pk }}" name="cleanup_minutes" value="{{ b.cleanup_minutes }}"></div>
     <div class="field"><label for="move-head-{{ b.pk }}">Expected students</label><input id="move-head-{{ b.pk }}" name="headcount" value="{{ b.headcount }}"></div>

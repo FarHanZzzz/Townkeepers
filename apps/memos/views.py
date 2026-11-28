@@ -71,6 +71,7 @@ def memo_list(request):
     if q:
         memos = memos.filter(subject__icontains=q) | memos.filter(event__title__icontains=q)
     rows = [(m, selectors.next_actor(m), STATUS_TONE.get(m.status, "warn")) for m in memos[:200]]
+    is_dosa = user.access_category == AccessCategory.DOSA_HEAD
     return render(
         request,
         "memos/memo_list.html",
@@ -80,6 +81,7 @@ def memo_list(request):
             "q": q,
             "statuses": MemoStatus.choices,
             "can_author": Action.MEMOS_AUTHOR in effective_actions(user),
+            "can_manage_templates": can(user, Action.MEMOS_MANAGE_TEMPLATES) or is_dosa,
             "queue": _queue(user),
             "can_reorder": can(user, Action.QUEUE_MANAGE),
             "today": clock.local_today(),
@@ -120,6 +122,8 @@ def memo_new(request):
         if not e.memos.filter(kind=Memo.Kind.ORIGINAL).exclude(status=MemoStatus.WITHDRAWN).exists()
     ]
     templates = MemoTemplate.objects.filter(is_active=True, current_version__isnull=False)
+    if request.user.access_category != AccessCategory.DOSA_HEAD:
+        templates = templates.filter(dosa_only=False)
     form = NewMemoForm(request.POST or None, events=events, templates=templates)
     if request.method == "POST" and form.is_valid():
         try:
@@ -551,6 +555,7 @@ def _template_input(form: TemplateForm) -> commands.TemplateInput:
         required_attachments=form.attachments(),
         signature_areas=form.signature_areas(),
         requires_budget=cd["requires_budget"],
+        dosa_only=cd.get("dosa_only", False),
     )
 
 
@@ -592,6 +597,7 @@ def template_detail(request, pk):
             "advisor_signature": "advisor" in cv.signature_areas,
             "dosa_signature": "dosa" in cv.signature_areas,
             "requires_budget": cv.requires_budget,
+            "dosa_only": template.dosa_only,
         }
     form = TemplateForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():

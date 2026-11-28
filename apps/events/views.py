@@ -8,7 +8,7 @@ from django.shortcuts import redirect, render
 from apps.clubs.selectors import visible_clubs
 from apps.platform_core import clock
 from apps.platform_core.access import AccessCategory, Action, can, effective_actions, require
-from apps.platform_core.exceptions import DomainError
+from apps.platform_core.exceptions import DomainError, PermissionDeniedError
 from apps.platform_core.forms import apply_domain_error
 
 from . import commands, selectors
@@ -157,7 +157,8 @@ def event_detail(request, pk):
 
 
 def venue_list(request):
-    require(request.user, Action.EVENTS_VIEW)
+    if request.user.access_category != AccessCategory.DOSA_HEAD:
+        raise PermissionDeniedError()
     return render(
         request,
         "events/venue_list.html",
@@ -165,6 +166,7 @@ def venue_list(request):
             "venues": Venue.objects.order_by("name"),
             "can_manage": request.user.access_category
             in {AccessCategory.DOSA_HEAD, AccessCategory.SYSTEM_ADMIN},
+            "can_restrict": request.user.access_category == AccessCategory.DOSA_HEAD,
         },
     )
 

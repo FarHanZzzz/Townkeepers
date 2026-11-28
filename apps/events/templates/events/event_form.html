@@ -3,6 +3,10 @@
 {% block content %}
 <h1>{{ title }}</h1>
 <form method="post" novalidate class="panel">{% csrf_token %}
+  <div class="cal-pick-row">
+    <button type="button" class="button secondary" data-calendar-open="schedule" data-calendar-title="Choose event dates and times" data-calendar-targets="id_first_date id_last_date id_start_time id_end_time">Choose dates &amp; times</button>
+    <p class="help">The calendar fills the four scheduling fields below. You can still edit them by hand.</p>
+  </div>
   {% include "includes/form.html" %}
   <div class="actions"><button type="submit">Save draft</button>{% if event %}<a href="{% url 'events:detail' event.pk %}">Cancel</a>{% else %}<a href="{% url 'events:list' %}">Cancel</a>{% endif %}</div>
 </form>

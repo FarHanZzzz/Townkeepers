@@ -1,11 +1,11 @@
-{% load static %}<!DOCTYPE html>
+{% load static ui %}<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a0c2b">
   <title>{% block title %}Amader TOWNHALL{% endblock %} · Amader TOWNHALL</title>
-  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static_v 'css/app.css' %}">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
@@ -126,7 +126,15 @@
   </dialog>
   {% endif %}
 
+  <script>
+    window.TOWNHALL_CALENDAR = {
+      data: "{% url 'events:calendar_data' %}",
+      venues: "{% url 'events:venue_availability' %}",
+      page: "{% url 'events:calendar' %}"
+    };
+  </script>
   <script src="{% static 'js/app.js' %}" defer></script>
+  <script src="{% static 'js/calendar.js' %}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

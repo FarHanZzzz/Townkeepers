@@ -2,7 +2,7 @@
 
 This is the entry point for any person or model continuing the build. Read it before touching code, and update it in the same change as the code (traceability table, decisions log, next steps).
 
-Last updated: Increments 3-6 have a first working slice (booking, finance totals, internal notices, handover, term counts, OCR evidence, external publishing, historical import). The workspace presentation and Nielsen heuristic pass is in the working tree. Quality gate green: 129 tests passing, ruff format/check clean, check_req_markers clean, interrogate 96.8%, sphinx build clean. Next: deepen each slice and complete the remaining analytics and publishing screens.
+Last updated: 27 Nov 2026. Increments 3-6 have a first working slice (booking, finance totals, internal notices, handover, term counts, OCR evidence, external publishing, historical import). The workspace presentation, Nielsen heuristic pass and shared calendar workspace (month heatmap, day detail, booking/scheduling popup, venue availability feed) are in the working tree with focused tests. Quality gate green: 151 tests passing, ruff format/check clean, `manage.py check` and `makemigrations --check` clean, check_req_markers clean, interrogate 100%, sphinx build clean. Next: deepen each slice and complete the remaining analytics and publishing screens.
 
 ---
 
@@ -31,7 +31,7 @@ The PRD is about 3,400 lines. Use the line ranges in section 12 to read only wha
 | Increment 1 (access and club setup) | Done: AC-15, AC-17 pass |
 | Increment 2 (first event and memo) | Done: AC-01, AC-13, AC-16 pass; memo parts of AC-18 and deadline parts of AC-19 pass |
 | Increments 3-6 | Local paths are in place: booking including a move, finance forms, unverified receipt reading, internal notices, external send that fails until a site is set, CSV import, handover, and term counts. Live venue figures, a real website, and a real receipt reader are not connected |
-| Tests | 129 passing on 22 Nov 2026 after the finance forms, booking move, receipt reading, external notice, and CSV import: unit, integration, PostgreSQL race, FastAPI contract, Playwright browser, acceptance. One pytest-playwright fixture warning |
+| Tests | 151 passing on 27 Nov 2026 after the finance forms, booking move, receipt reading, external notice, CSV import, calendar workspace and DoSA-only venue screens: unit, integration, PostgreSQL race, FastAPI contract, Playwright browser, acceptance. One pytest-playwright fixture warning |
 | Coverage | Full suite 82% of `apps`, `assistance` and `config`. Unit and contract layers alone: 25% (reported separately) |
 | Lint and format | Ruff clean. `manage.py check` clean. `check --deploy` clean with production settings |
 | Docstrings | 100% of public command members (`interrogate`) |
@@ -279,7 +279,8 @@ Status: **Done** means all Success and Failure outcomes are implemented with tes
 | FR-MEM-13 | Withdraw or export | Done | `withdraw_memo`, `memos/export.py` |
 | FR-EVT-01 | Create event record | Done | `create_event` |
 | FR-EVT-02 | Change event details | Partial: draft edits with stale protection. Approved-event amendment proposals arrive in Increment 3 | `save_event_draft` |
-| FR-EVT-03 .. FR-EVT-11 | Venues, availability, booking, overlap, confirmation, decide, reschedule, calendar, blocks | Not started (Increment 3) | |
+| FR-EVT-03 .. FR-EVT-09, FR-EVT-11 | Venues, availability, booking, overlap, confirmation, decide, reschedule, blocks | Partial: first slice in Increment 3 | `apps/events/{booking,policies,views}.py`, `test_booking_calendar.py` |
+| FR-EVT-10 | Show the internal event calendar | Partial: month heatmap, club/venue/status filters, day detail, upcoming list and one heat rule shared by the page and JSON feed. Week view and a separate date filter remain open | `apps/events/desk_calendar.py`, `static/js/calendar.js`, `tests/integration/test_calendar_workspace.py` |
 | FR-EVT-12 | Separate event, memo and booking statuses | Partial: the event page shows separate statuses; booking arrives in Increment 3 | `events/event_detail.html` |
 | FR-EVT-13 | Restricted hours in Dhaka time | Not started (Increment 3) | |
 | FR-EVT-14 | Complete or cancel event | Not started (Increment 3) | |
@@ -376,6 +377,11 @@ Add a row whenever you interpret the PRD, technical requirements or SDS. Candida
 | D-23 | The first venue catalogue is synthetic and labelled: one classroom, MPH, DMK, and the Auditorium. Capacities and hours are not official IUB figures | Project owner. PRD C.2 venue values are still unsupplied |
 | D-24 | IUB Google sign-in is not offered. `/auth/google/start` and `/auth/google/callback` are not routed. Sign-in is the demonstration persona picker while `DEMO_AUTH` is on (R1.2) | Project owner, 22 Nov 2026 |
 | D-25 | A receipt reading comes from the local fake provider and stays unverified until a person verifies the expense. `EXTERNAL_PUBLISH_URL` is empty by default, so an external notice is recorded as failed and the internal event is unchanged | No live OCR vendor or club website is configured |
+| D-26 | Calendar heat is 0-2 events green, exactly 3 orange and 4+ red, computed once in `desk_calendar.heat_level` for both the page and the JSON feed. A multi-day event is counted on each day it spans (R1.2 for the exact thresholds) | The calendar copy and the shared-rule requirement (AGENTS.md section 2); the PRD does not fix thresholds |
+| D-27 | `static_v` appends the asset's mtime to CSS URLs; if the finder cannot resolve the file it returns the plain static URL. Calendars use one popup for view, booking and scheduling rather than three page variants | Presentation pass. Avoids stale assets in a long-lived browser tab; degrades safely when static files are collected |
+| D-28 | Dashboard, Venues, Finance, Reports, Clubs and Profile requests appear in the sidebar only for the DoSA persona. Server-side permissions are unchanged; other personas keep Events, Memos, Notifications and My Profile | Project owner, 27 Nov 2026. Navigation is presentation (FR-IAM-06), not authorization |
+| D-29 | Restricted hours are DoSA-only: `booking.add_restriction`, `desk.venue_restrict` and the Venues form all check `AccessCategory.DOSA_HEAD`. System Admin and EB personas are denied in the command and the view. Venue blocks and central activities keep their existing `can_manage` rule | Project owner, 27 Nov 2026. This is a setting, not a booking action (FR-EVT-03) |
+| D-30 | The Venues page itself (`venue_list`) is DoSA-only, so no other persona can reach the venue management screen even by URL. Management actions (`venue_new`, `venue_edit`, `venue_block`) keep their previous DoSA/System Admin split | Project owner, 27 Nov 2026. Screen-level scoping is presentation plus page-level enforcement (FR-EVT-03) |
 
 ---
 
@@ -448,7 +454,7 @@ Read PRD lines 839-1077 (FR-EVT), 2586-2834 (UC-27 to UC-34), section 2.6 (routi
    - `complete_event`.
    - Event Approved = memo approved and (no booking required, or booking confirmed).
 4. **Race test (AC-02):** two `confirm_booking` calls on overlapping requests at a `Barrier` must leave exactly one active reservation. Reuse `tests/race/test_memo_races.py:race`.
-5. **Screens.** Venue catalogue, availability search (free, pending, booked, unavailable; another club's details hidden), booking form (classroom and large-venue variants), DoSA booking review, calendar (month, week and list), and the event page with booking status.
+5. **Screens.** Venue catalogue, availability search (free, pending, booked, unavailable; another club's details hidden), booking form (classroom and large-venue variants), DoSA booking review, calendar and the event page with booking status. The calendar now has a month heatmap with a day detail pane, an upcoming list and one modal used for viewing, booking and scheduling; its JSON feeds back the modal. Still open: week view and a separate date filter (FR-EVT-10).
 6. **Settings.** Extend `PolicyVersion` or add a venue-rule version to cover "venue restrictions" in FR-IAM-08.
 
 ### Increment 4: Finance and evidence (AC-03, AC-04, AC-12, AC-20)

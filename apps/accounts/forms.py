@@ -13,7 +13,9 @@ class ProvisionForm(CommandForm):
     iub_email = forms.EmailField(
         label="IUB email", help_text="Sign-in instructions go to this address only."
     )
-    access_category = forms.ChoiceField(choices=AccessCategory.choices)
+    access_category = forms.ChoiceField(
+        choices=[c for c in AccessCategory.choices if c[0] != AccessCategory.SIGNER]
+    )
     designation = forms.CharField(
         max_length=120,
         required=False,
@@ -26,6 +28,13 @@ class ProvisionForm(CommandForm):
     emergency_phone = forms.CharField(max_length=20, required=False)
     permanent_address = forms.CharField(widget=forms.Textarea(attrs={"rows": 2}), required=False)
     temporary_address = forms.CharField(widget=forms.Textarea(attrs={"rows": 2}), required=False)
+    club = forms.ModelChoiceField(queryset=None, required=False, label="Club affiliation")
+    term = forms.ModelChoiceField(
+        queryset=None,
+        required=False,
+        label="EB term (required for EB members)",
+        help_text="Select the active/upcoming term for EB member profiles.",
+    )
     use_default_grants = forms.BooleanField(
         required=False,
         initial=True,
@@ -44,8 +53,28 @@ class ProvisionForm(CommandForm):
 
     def __init__(self, *args, allow_demo: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
+        from apps.clubs.models import Club, Term
+
+        self.fields["club"].queryset = Club.objects.filter(status=Club.Status.ACTIVE).order_by("name")
+        self.fields["term"].queryset = Term.objects.filter(
+            status__in=[Term.Status.UPCOMING, Term.Status.ACTIVE]
+        ).select_related("club").order_by("club__name", "-start_date")
         if not allow_demo:
             del self.fields["is_demo"]
+
+    def clean(self):
+        cleaned = super().clean()
+        category = cleaned.get("access_category")
+        club = cleaned.get("club")
+        term = cleaned.get("term")
+        if category in {AccessCategory.EB_MEMBER, AccessCategory.FACULTY_ADVISOR}:
+            if not club:
+                self.add_error("club", "A club affiliation is required for this access category.")
+            if category == AccessCategory.EB_MEMBER and not term:
+                self.add_error("term", "An EB term is required for EB member profiles.")
+            if term and club and term.club_id != club.pk:
+                self.add_error("term", "Select a term that belongs to the chosen club.")
+        return cleaned
 
 
 class GrantsForm(CommandForm):

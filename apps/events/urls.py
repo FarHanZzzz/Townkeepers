@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import desk, views
+from . import desk, desk_calendar, views
 
 app_name = "events"
 
@@ -15,7 +15,9 @@ urlpatterns = [
     path("venues/block/", views.venue_block, name="venue_block"),
     path("venues/restrict/", desk.venue_restrict, name="venue_restrict"),
     path("availability/", desk.availability_search, name="availability"),
-    path("calendar/", desk.calendar, name="calendar"),
+    path("calendar/", desk_calendar.calendar, name="calendar"),
+    path("calendar-data/", desk_calendar.calendar_data, name="calendar_data"),
+    path("venue-availability/", desk_calendar.venue_availability_data, name="venue_availability"),
     path("suggestions/", desk.slot_suggestions, name="suggestions"),
     path("<int:pk>/book/", views.booking_new, name="book"),
     path("bookings/<int:booking_id>/decide/", views.booking_decide, name="booking_decide"),

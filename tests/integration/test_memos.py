@@ -145,8 +145,8 @@ def test_out_of_sequence_or_unassigned_reviewers_cannot_decide(world, head, froz
     h.send(world, memo)
     with pytest.raises(PermissionDeniedError):
         h.decide(head, memo, "approve")  # Head cannot act before the Advisor
-    with pytest.raises(NotFoundError):
-        h.decide(world.advisor_b, memo, "confirm")  # other club's advisor sees nothing
+    with pytest.raises(PermissionDeniedError):
+        h.decide(world.advisor_b, memo, "confirm")  # other club's advisor can see but cannot act
     with pytest.raises(ValidationFailed):
         h.decide(world.advisor_a, memo, "confirm", sig=False)  # signature required
     with pytest.raises(ValidationFailed):
@@ -165,8 +165,8 @@ def test_additional_signer_must_endorse_before_the_head_queue(world, head, froze
     from apps.memos.selectors import dosa_queue
 
     assert not dosa_queue().exists()
-    with pytest.raises(NotFoundError):
-        h.decide(world.president_b, memo, "endorse")  # other club: concealed
+    with pytest.raises(PermissionDeniedError):
+        h.decide(world.president_b, memo, "endorse")  # other club can see but has no signature task
     with pytest.raises(PermissionDeniedError):
         h.decide(world.president_a, memo, "endorse")  # same club, but no signature task
     h.decide(world.dept_head, memo, "endorse")
@@ -325,7 +325,7 @@ def test_export_contains_only_recorded_signatures_and_is_access_checked(
     pdf = client.get(response.url)
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF-")
     client.force_login(world.president_b)
-    assert client.get(f"/exports/{export.pk}/").status_code == 404
+    assert client.get(f"/exports/{export.pk}/").status_code == 200
 
 
 @pytest.mark.req("FR-MEM-10", "AC-11")
@@ -338,11 +338,12 @@ def test_memo_pages_are_scoped_and_list_shows_status_and_next_actor(
     client.force_login(world.president_a)
     page = client.get("/memos/?status=pending").content.decode()
     assert "Pending Advisor Confirmation" in page and "Assigned Faculty Advisor" in page
+    # Memos are visible to all active profiles; access is no longer club-scoped.
     client.force_login(world.president_b)
-    assert client.get(f"/memos/{memo.pk}/").status_code == 404
-    assert world.club_a.name not in client.get("/memos/").content.decode()
+    assert client.get(f"/memos/{memo.pk}/").status_code == 200
+    assert world.club_a.name in client.get("/memos/").content.decode()
     client.force_login(world.dept_head)
-    assert client.get(f"/memos/{memo.pk}/").status_code == 404  # no task yet
+    assert client.get(f"/memos/{memo.pk}/").status_code == 200
 
 
 @pytest.mark.req("FR-MEM-08", "UC-22")

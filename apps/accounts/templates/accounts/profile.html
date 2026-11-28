@@ -10,7 +10,13 @@
     <tr>
       <td data-label="Field">{{ label }}</td>
       <td data-label="Saved value">{{ value }}</td>
-      <td data-label="Change"><a href="{% url 'accounts:profile_change' field %}" aria-label="Request a change to {{ label }}"><span aria-hidden="true">&#9998;</span> Request change</a></td>
+      <td data-label="Change">
+        {% if field in direct_edit_fields %}
+          <a href="{% url 'accounts:profile_change' field %}" aria-label="Edit {{ label }}"><span aria-hidden="true">&#9998;</span> Edit</a>
+        {% else %}
+          <a href="{% url 'accounts:profile_change' field %}" aria-label="Request a change to {{ label }}"><span aria-hidden="true">&#9998;</span> Request change</a>
+        {% endif %}
+      </td>
     </tr>
   {% endfor %}
   </tbody>

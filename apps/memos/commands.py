@@ -105,6 +105,7 @@ class TemplateInput:
     required_attachments: tuple[dict, ...] = ()
     signature_areas: tuple[str, ...] = ("advisor", "dosa")
     requires_budget: bool = False
+    dosa_only: bool = False
     extra: dict = field(default_factory=dict)
 
 
@@ -221,10 +222,18 @@ def create_template(actor, data: TemplateInput, *, operation_key: str | None) ->
         if errors:
             raise ValidationFailed(field_errors=errors)
         template = MemoTemplate.objects.create(
-            label=data.label.strip(), created_by=actor, created_at=clock.now()
+            label=data.label.strip(),
+            dosa_only=data.dosa_only,
+            created_by=actor,
+            created_at=clock.now(),
         )
         version = _new_template_version(template, data, actor)
-        audit.record(actor, "memo_template.create", template, after={"version": version.number})
+        audit.record(
+            actor,
+            "memo_template.create",
+            template,
+            after={"version": version.number, "dosa_only": template.dosa_only},
+        )
         return CommandResult("memos.memotemplate", template.pk, "created")
 
     return execute(
@@ -254,6 +263,7 @@ def _new_template_version(template: MemoTemplate, data: TemplateInput, actor) ->
     )
     template.current_version = version
     template.label = version.label
+    template.dosa_only = data.dosa_only
     if template.is_active and not set(version.signature_areas) >= REQUIRED_SIGNATURE_AREAS:
         template.is_active = False
     template.save()
@@ -282,7 +292,12 @@ def revise_template(
         if errors:
             raise ValidationFailed(field_errors=errors)
         version = _new_template_version(template, data, actor)
-        audit.record(actor, "memo_template.revise", template, after={"version": version.number})
+        audit.record(
+            actor,
+            "memo_template.revise",
+            template,
+            after={"version": version.number, "dosa_only": template.dosa_only},
+        )
         return CommandResult(
             "memos.memotemplate", template.pk, "revised", {"version": version.number}
         )
@@ -371,6 +386,8 @@ def create_memo(
         )
         if template is None or template.current_version is None:
             raise ValidationFailed(field_errors={"template": ["Choose an active template."]})
+        if template.dosa_only and actor.access_category != AccessCategory.DOSA_HEAD:
+            raise NotFoundError()
         if (
             Memo.objects.filter(event=event, kind=Memo.Kind.ORIGINAL)
             .exclude(status=MemoStatus.WITHDRAWN)
